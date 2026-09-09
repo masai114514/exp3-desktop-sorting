@@ -1,0 +1,20 @@
+{
+  "_comment": "任务参数。camera.calib: rectilinear = 正俯视仿射映射(px->米); homography = 透视 3x3。★甲 M1 前把真实标定回填; 未标定时几何测试用合成的 calib。",
+  "classes": ["cup", "mouse"],
+  "expected_total": 6,
+  "pass_line": 5,
+  "conf_min": 0.5,
+  "fail_limit": 3,
+  "no_exec_limit": 3,
+  "max_rounds": 60,
+  "log_dir": "exp3_logs",
+  "camera": {
+    "image_width_px": 640,
+    "image_height_px": 480,
+    "calib": {
+      "mode": "rectilinear",
+      "offset_px": [320.0, 240.0],
+      "scale_px_per_m": [1000.0, 1000.0]
+    }
+  }
+}

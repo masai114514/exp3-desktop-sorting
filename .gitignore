@@ -1,0 +1,5 @@
+__pycache__/
+*.py[cod]
+exp3_logs/
+.pytest_cache/
+.DS_Store

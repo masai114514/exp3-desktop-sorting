@@ -1,0 +1,29 @@
+# PickPlace.action —— 实验3「按网格取物 → 按类别放入料盒」抓取接口（契约 v1）
+#
+# 语义：把 cell_id 网格里的物体抓起来，按类别放进对应料盒，再退回安全位。
+#   goal 只给 cell_id + 期望类别 cls。取放点/高度从 config 读，不写死在 goal：
+#     取放点   = config/grid_cells.json  的该格中心(x,y) + pick_z_m/object_z_m
+#     料盒     = config/bins.json 的 class_to_bin[cls]
+#   （对齐 docx：任务开始后不人工指定类别/网格/放置区）
+# 长任务：服务端按阶段发 feedback；客户端可随时 cancel → 服务端回 aborted 并安全停止。
+#
+# 阶段编号约定（业务常量，代码里定义，不在 action 里；.action 不支持常量）：
+#   STAGE_APPROACH=1  STAGE_GRASP=2  STAGE_LIFT=3
+#   STAGE_MOVE_TO_BIN=4  STAGE_PLACE=5  STAGE_RETRACT=6   （-1 = 失败进行中）
+#
+# reason 取值见 exp3/sort_core/taxonomy.py：
+#   ok 情况 success=true；失败 reason ∈ {grasp_failed, dropped_or_missed_place,
+#   unreachable_target, exec_error, aborted}；normal(?) 安全停止用 aborted/safety 语义由服务端补 detail。
+
+# ================= Goal =================
+string cell_id        # 目标网格 id（必须存在于 config/grid_cells.json 的 cells[].id）
+string cls            # 期望类别，如 'cup' / 'mouse'（服务端可拿它与识别类别校验）
+
+# ================= Feedback =================
+int32 stage           # 当前阶段（见上约定；-1=失败进行中）
+string note           # 人类可读进度，如 'descending to c3'
+
+# ================= Result =================
+bool success          # 是否完成一次成功的“取放 + 退回安全位”
+string reason         # 失败原因枚举；success=true 时为 'ok'
+string detail         # 自由文本（进日志 detail 字段）
