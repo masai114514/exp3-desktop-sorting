@@ -63,6 +63,7 @@ exp3/
 │   ├── task.json             任务参数：conf_min、连续失败上限、expected_total、pass_line；camera.calib
 │   └── log_schema.md         日志字段说明（对齐 c4_2 result.json 口径）
 ├── config_check.py           ★ 回填自检器：grid/bins/camera/cross 契约一致性，改 config 后先跑
+├── docs/                     提交材料：异常测试记录（docx §三/四）、依赖说明（§七.1）
 ├── sort_core/                ★ 任务控制纯 Python 核心（离线可测）
 │   ├── taxonomy.py           reason / verdict 常量
 │   ├── geometry.py           bbox 中心 → 桌面点 → 网格 cell（rectilinear / homography）
