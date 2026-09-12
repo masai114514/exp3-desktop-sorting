@@ -110,9 +110,11 @@ class DetectionD2aNode(Node):
             cls_id = int(box.cls[0])
             cls_name = results.names[cls_id] if results.names else CLASS_NAMES[cls_id]
 
-            # —— bbox 口径（★待组长确认，二选一）——
-            # Detection2D 规范是“中心 + 尺寸”的归一化坐标。config/task.json 已把图像钉死
-            # 640x480，因此两套可互相换算；甲那边 px_to_table 用的是像素，二选一看队伍口径。
+            # —— bbox 口径：已定为「归一化 [0,1]、原点左上、中心 + 尺寸」（2026-09-12）——
+            # 注意：vision_msgs 本身不强制归一化还是像素（.msg 表达不了这个约束），
+            # 所以这是【队伍口径】不是规范要求；答辩若被问到，照这个说，别说成"spec 规定的"。
+            # 消费侧 scan_from_detections.py 按 config/task.json 的图像尺寸(640x480)还原像素
+            # xyxy，所以仿真相机分辨率必须与 config 一致，改分辨率要三人同步。
             cx_px = (x1 + x2) / 2.0
             cy_px = (y1 + y2) / 2.0
             w_px = x2 - x1
