@@ -1,0 +1,48 @@
+{
+  "_comment": "★EP 真机执行侧标定表(组长负责)。这里只放『EP 怎么动』—— 识别/几何在 task.json + grid_cells.json + bins.json。文件内的量全部要**现场实测**: 底盘位姿是 odom 读数、臂姿态是 jog 试出来的, 都没有可推断的默认值 ⇒ 未标定的项一律 null(不是编个像样的数填上 —— 实验二踩过这个坑: 编的占位值恰好能过全部结构检查)。",
+  "calibration": {
+    "status": "uncalibrated",
+    "by": null,
+    "date": null,
+    "venue": null,
+    "note": "★真机硬闸门。cell_pose/bin_pose/arm 三处填完 + 上面 by/date/venue 填全 + status 改 calibrated, run_real.py 才启动。换场地/重新上电必须重标底盘并把 status 打回 uncalibrated —— odom 原点跟着上电位姿走(见 ep/config_ep.json chassis.odom_cs=1 的说明)。"
+  },
+  "chassis": {
+    "_note": "位姿是底盘里程计读数 [x_m, y_m, z_deg](x 前 / y 左 / z 旋转)。读法: 手推/遥控把 EP 摆到位 → python3 ep/drive/env_check.py --config ep/config_ep.json --odom 读当前 odom。标定和运行必须同口径(cs=1, 以上电位姿为原点)。",
+    "home_pose": null,
+    "move_tol_m": 0.03,
+    "_move_tol_note": "goto() 每段读 odom 做误差纠正的容差; 底盘是开环定位, 给太紧会一直补正。0.03m 沿用实验二。"
+  },
+  "arm": {
+    "_note": "2 轴并联臂末端 [x_mm(前), y_mm(上)]。用 python3 ep/drive/env_check.py --config ep/config_ep.json --jog 在机上试: 人盯着爪底, 试到 grab_low 爪指正好包住目标物、lift_high 爪底高于目标物顶面。★别照抄 0 —— 实验二实测校准后臂的 x 在几十 mm 量级(x≈74)。",
+    "grab_low_mm": null,
+    "lift_high_mm": null,
+    "release_low_mm": null,
+    "_release_note": "null = 与 grab_low_mm 同高(料盒面高与桌面一致时的常规情形)。料盒有沿/垫高才需要单独标一个。",
+    "lift_wait_s": 1.0,
+    "drop_wait_s": 1.0
+  },
+  "gripper": {
+    "_note": "open/close power 官方范围 1..100(速度/力度档)。从 60 起步, 现场试夹调: 夹稳不掉 + 电机不啸叫。真机目标物若是圆瓶身会打滑, 要比方块给得高一点。",
+    "open_power": 60,
+    "close_power": 60,
+    "act_wait_s": 1.5
+  },
+  "cell_pose": {
+    "_note": "每个网格一格一个底盘位姿 —— EP 臂只有『前伸』一个水平自由度(x_mm), 桌面横向得靠底盘横移/转向过去, 所以格子之间是要动底盘的。",
+    "c1": null, "c2": null, "c3": null,
+    "c4": null, "c5": null, "c6": null
+  },
+  "bin_pose": {
+    "_note": "每个料盒一个底盘位姿。放料盒的位置要保证: 从该位姿下探不会压到网格、也不会撞桌沿。",
+    "bin_cup": null,
+    "bin_mouse": null
+  },
+  "judge": {
+    "_note": "EP 没有任何物块位姿感知(红外/视觉感知不在骨架范围) ⇒ 夹起/放正只能人工确认, 对齐实验二 judge.operator_confirm 口径。人工确认的是『夹住没有/放正没有』, **不是**判类别、也不是触发动作 —— docx §六 禁的是后者(类别由识别给、动作由任务控制给)。",
+    "held": "operator_confirm",
+    "placed": "operator_confirm",
+    "retry_grab": 1,
+    "retry_retract": 1
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "_comment": "真机分类料盒(放置区) 与 class→料盒 映射。坐标是桌面上实测位置(料盒中心)。★料盒必须和网格在**同一张台面**上: EP 臂水平行程只 ~0.22m、垂直 ~0.15m, 摆不下第二个台面(2026-09-15 硬件确认)。",
+  "bins": {
+    "bin_cup":   {"cls": "cup",   "x_m": 0.040, "y_m": 0.200, "_note": "示例, 待回填"},
+    "bin_mouse": {"cls": "mouse", "x_m": 0.180, "y_m": 0.200, "_note": "示例, 待回填"}
+  },
+  "class_to_bin": {"cup": "bin_cup", "mouse": "bin_mouse"},
+  "calibration": {
+    "status": "uncalibrated",
+    "by": null,
+    "date": null,
+    "venue": null,
+    "note": "组长负责。做法: 料盒摆到桌面网格外侧(docx §五 要求 >=2 个分类区域), 卷尺量料盒中心坐标回填 x_m/y_m, 并删掉各 bin 的 _note。放之前先确认 EP 从料盒位姿能够到、且不压到网格。"
+  }
+}

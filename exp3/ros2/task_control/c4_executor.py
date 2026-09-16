@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""C4PickExecutor —— 用 c4_2 直驱原语实现 PickExecutor（多格多料盒版单次取放）。
+"""C4PickExecutor —— **仿真线**的执行者：用 c4_2 直驱原语实现 PickExecutor（多格多料盒版单次取放）。
+
+> 真机线（RoboMaster EP）的对应物是 `real/ep_backend.py` 的 `EPPickExecutor`：同一个
+> PickExecutor ABC、同样 6 段、同样的阶段号，但走 EP Python SDK 而非 C4Driver，且不经过 ROS2。
+> 两者**互不相干**，改一个不用动另一个。本文件只服务 Gazebo 仿真线。
 
 它**组合**一个 C4Driver 实例（c4_2/drive/c4_cycle.py）当“robot”，只调它的运动原语，不再
 照搬 C4Driver.run() 的固定 A/B 周期。与 c4_2 cycle 的三点差异（联调时最容易踩）：
@@ -8,7 +12,7 @@
      任务控制选哪格就夹哪格 —— 这里只做『到格→夹→抬→搬→放→退』，不碰 spawn/delete。
   2. **多 A/B**：A(格中心)、B(料盒中心) 由 server 的 resolve_goal 现查放 ctx，本类不读 config。
   3. **判 held/placed 不做死**：sim 接触受限(见 c4_2 注释)时 held 判定不可靠，默认 assume
-     (对齐 c4_2 --rehearsal 口径)。真判据在 Jetson 联调时 override _judge_hold/_judge_place
+     (对齐 c4_2 --rehearsal 口径)。真判据在 Gazebo 联调时 override _judge_hold/_judge_place
      （读物体位姿/或人工确认），本文件保持无 ROS import、可离线用假 robot 测时序。
 
 robot 需要的最小运动面（C4Driver 均满足；返回签名照 c4_2/drive/c4_cycle.py）：
@@ -56,7 +60,7 @@ class C4PickExecutor(PickExecutor):
         B_place = (B['x'], B['y'], self._place_z)
         return A_above, A_grasp, A_lift, B_place
 
-    # ---------- 判据（默认 assume；Jetson 联调 override 接真感知） ----------
+    # ---------- 判据（默认 assume；Gazebo 联调 override 接真感知） ----------
     def _judge_hold(self, ctx):
         return self._hold_assume, 'held assumed（联调时 override _judge_hold 接真感知）'
 

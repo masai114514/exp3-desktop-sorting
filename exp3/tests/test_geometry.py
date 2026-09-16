@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import unittest
 
-from sort_core.geometry import (bbox_center, px_to_table, point_to_cell,
+from sort_core.geometry import (bbox_center, px_to_table, table_to_px, point_to_cell,
                                 locate, cell_center)
 from sort_core import config as cfgmod
 
@@ -46,6 +46,40 @@ class TestHomography(unittest.TestCase):
         x, y = px_to_table(410, 240, H)
         self.assertAlmostEqual(x, 0.09)
         self.assertAlmostEqual(y, 0.0)
+
+
+class TestTableToPx(unittest.TestCase):
+    """table_to_px 是 px_to_table 的逆 —— 真机链路的 mock 检测器靠它把"物体在哪一格"变成
+    "它该出现在画面哪儿"，所以这里的重点是**往返一致**（两种模式都要）。"""
+
+    def test_rectilinear_roundtrip(self):
+        for (x, y) in ((0.05, 0.05), (0.41, 0.24), (0.0, 0.0)):
+            px, py = table_to_px(x, y, RECT)
+            bx, by = px_to_table(px, py, RECT)
+            self.assertAlmostEqual(bx, x)
+            self.assertAlmostEqual(by, y)
+
+    def test_homography_roundtrip(self):
+        H = {'mode': 'homography', 'H': [[0.001, 0.0, -0.32],
+                                         [0.0, 0.001, -0.24],
+                                         [0.0, 0.0, 1.0]]}
+        px, py = table_to_px(0.09, 0.0, H)
+        self.assertAlmostEqual(px, 410.0)
+        self.assertAlmostEqual(py, 240.0)
+
+    def test_homography_uses_inverse_not_h(self):
+        # 真透视(非仿射)：H 的逆不能靠读 H 本身得到，验证确实求了逆
+        H = {'mode': 'homography', 'H': [[1.0, 0.2, 100.0], [0.1, 1.0, 50.0], [0.001, 0.002, 1.0]]}
+        px, py = table_to_px(0.3, 0.2, H)
+        bx, by = px_to_table(px, py, H)
+        self.assertAlmostEqual(bx, 0.3, places=9)
+        self.assertAlmostEqual(by, 0.2, places=9)
+
+    def test_degenerate_returns_none(self):
+        self.assertIsNone(table_to_px(0.1, 0.1, dict(RECT, scale_px_per_m=[0.0, 1000.0])))
+        # 奇异矩阵（第三行全 0 → 不可逆）
+        sing = {'mode': 'homography', 'H': [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 0.0]]}
+        self.assertIsNone(table_to_px(0.1, 0.1, sing))
 
 
 class TestPointToCell(unittest.TestCase):

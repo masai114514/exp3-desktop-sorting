@@ -1,0 +1,29 @@
+{
+  "_comment": "★真机线配置。与 config/(仿真线) **分目录**, 互不覆盖: 仿真线是 mechArm 270 的世界坐标, 真机线是 EP 现场实测值, 两套数不可能一样。任务控制(sort_core)只吃本文件内容, 不关心它在哪个目录 —— 换目录即换场景, 代码一行不改。",
+  "classes": ["cup", "mouse"],
+  "expected_total": 6,
+  "pass_line": 5,
+  "conf_min": 0.5,
+  "fail_limit": 3,
+  "no_exec_limit": 3,
+  "max_rounds": 60,
+  "log_dir": "exp3_logs_real",
+  "camera": {
+    "image_width_px": 640,
+    "image_height_px": 480,
+    "_note": "与实验一同款 USB 摄像头(用户 2026-09-15 确认)。改分辨率必须同步重标 calib —— 像素尺度变了, 旧标定直接作废。",
+    "calib": {
+      "mode": "rectilinear",
+      "_note": "★示例占位, 待回填(乙)。rectilinear 只在相机光轴垂直向下时成立; 真机支架是斜俯视(把相机垫高放桌上/借架子) ⇒ 要换成 \"mode\": \"homography\" + 3x3 H。填完删掉本 _note, 并把 calibration.status 改成 calibrated。",
+      "offset_px": [320.0, 240.0],
+      "scale_px_per_m": [1000.0, 1000.0]
+    },
+    "calibration": {
+      "status": "uncalibrated",
+      "by": null,
+      "date": null,
+      "venue": null,
+      "note": "乙负责。做法: 桌上摆 4 个已知点(卷尺量坐标) → 图里读出对应像素 → 解 H(4 点用最小二乘/DLT)。判据: 反投影误差 <= 半个格子宽。标完把 mode/H 回填上面的 calib, 删掉 calib._note, 这里 status 改 calibrated 并填 by/date/venue。"
+    }
+  }
+}

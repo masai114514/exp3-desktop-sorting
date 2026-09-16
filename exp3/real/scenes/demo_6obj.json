@@ -1,0 +1,21 @@
+{
+  "_comment": "mock 检测器的场景文件：『桌上摆了哪些物体』。真机跑用真检测器时不需要它。换一个物体表就是换一个场景 —— 异常项靠 extra_dets 注入，不用改代码。",
+  "objects": [
+    {"cell": "c1", "cls": "cup"},
+    {"cell": "c2", "cls": "mouse"},
+    {"cell": "c3", "cls": "cup"},
+    {"cell": "c4", "cls": "mouse"},
+    {"cell": "c5", "cls": "cup"},
+    {"cell": "c6", "cls": "mouse"}
+  ],
+  "extra_dets": [],
+  "_extra_dets_用法": [
+    "空(默认) → 6 物全成功，exit=no_target，verdict=PASS",
+    "未知类别 → 每轮多一条 {'cls': 'stapler', 'conf': 0.9, 'bbox': [x-6,y-6,x+6,y+6]}：",
+    "   任务层判 unrecognized_object 跳过，其余 6 物照常分类 → 演示『未识别跳过』",
+    "低于 conf_min → conf 填 0.3(低于 task.conf_min=0.5)：同样走 unrecognized_object 分支",
+    "网格外 → bbox 中心放到网格外但仍在画面内：判 out_of_grid → 演示『空网格跳过』",
+    "注: 真机验这两类异常**不用改这里** —— 桌上放一个没训练过的物体(低置信)就够了，",
+    "    这才是 docx §六 要的『真机异常测试』。extra_dets 主要给离线/dry-run 排练用。"
+  ]
+}

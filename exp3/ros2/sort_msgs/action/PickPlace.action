@@ -1,6 +1,7 @@
 # PickPlace.action —— 实验3 抓取接口（契约，权威版见 exp3/contract/PickPlace.action）
 # 语义：把 cell_id 网格物体抓起、按 class_to_bin[cls] 放入料盒、退回安全位。
-# 坐标不写死：取放点读 config/grid_cells.json，料盒读 config/bins.json。
+# 坐标不写死：取放点/料盒由执行线各自的 config 决定（仿真 config/，真机 config_real/），
+# 两条线的 goal 完全相同（只有 cell_id + cls）。
 
 string cell_id
 string cls

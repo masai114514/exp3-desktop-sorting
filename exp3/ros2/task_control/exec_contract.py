@@ -1,8 +1,13 @@
 # -*- coding: utf-8 -*-
 """PickPlace 执行契约（**ROS-free**）：PickExecutor ABC + goal→A/B 解算。
 
-放成非 ROS 模块，是为了让 C4PickExecutor 和离线单测在没有 rclpy/vision_msgs 的环境里
-import（只需要 sort_core）。Jetson 上的 action server 也从这里取契约，保证同一份。
+放成非 ROS 模块，是为了让两条线都能用：仿真执行者 C4PickExecutor、**真机执行者
+EPPickExecutor**（`real/ep_backend.py`，EP 不走 ROS2）和离线单测，都从**同一处**取契约，
+保证不会分叉 —— 所以它在 `ros2/` 目录下，却不 import 任何 ROS。
+
+ctx 里的 A/B 是**桌面系**坐标（相机标定那条线的坐标系）。真机执行者只取 ctx 的
+`cell_id`/`bin_id`，拿 id 去 `config_real/ep_waypoints.json` 查底盘里程计位姿 ——
+两个坐标系之间没有已知关系也不需要建立，见 `real/ep_backend.py` 的设计决定 1。
 
 方法签名统一是 (self, ctx)，ctx = resolve_goal 的返回：
     {cell, cell_id, cls, bin_id,

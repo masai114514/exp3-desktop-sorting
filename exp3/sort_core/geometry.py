@@ -37,6 +37,48 @@ def px_to_table(px, py, calib):
     raise ValueError('unknown camera.calib.mode: %r' % mode)
 
 
+def _inv3(m):
+    """3x3 求逆（奇异返回 None）。与 config_check._inv3 是同一份算法 —— 那边刻意**不**
+    import sort_core（自检器要能在只有 config 的情况下独立跑），所以这里不共用。"""
+    a, b, c = m[0]
+    d, e, f = m[1]
+    g, h, i = m[2]
+    det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+    if abs(det) < 1e-12:
+        return None
+    return [[(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det],
+            [(f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det],
+            [(d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det]]
+
+
+def table_to_px(x_m, y_m, calib):
+    """桌面(机器人系)点 → 像素。px_to_table 的逆；映射不可用(奇异/退化)返回 None。
+
+    用途是**反投影**：把"物体在哪个格"变成"它该出现在画面哪儿"。真机链路里给 mock 检测器
+    及各种合成/回放用（真检测器不需要它 —— 它本来就输出像素）。
+    """
+    mode = calib.get('mode', 'rectilinear')
+    if mode == 'rectilinear':
+        cx, cy = calib['offset_px']
+        sx, sy = calib['scale_px_per_m']
+        if abs(sx) < 1e-9 or abs(sy) < 1e-9:
+            return None
+        return cx + sx * x_m, cy + sy * y_m
+    if mode == 'homography':
+        # calib['H'] 定义成 px→robot（见 px_to_table），所以正向投影要用它的逆
+        inv = _inv3(calib['H'])
+        if inv is None:
+            return None
+        a, b, c = inv[0]
+        d, e, f = inv[1]
+        g, h, i = inv[2]
+        w = g * x_m + h * y_m + i
+        if abs(w) < 1e-9:
+            return None
+        return ((a * x_m + b * y_m + c) / w, (d * x_m + e * y_m + f) / w)
+    raise ValueError('unknown camera.calib.mode: %r' % mode)
+
+
 def point_in_cell(x_m, y_m, cell):
     return (cell['x0'] <= x_m <= cell['x1']) and (cell['y0'] <= y_m <= cell['y1'])
 

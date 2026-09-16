@@ -1,11 +1,16 @@
 # sort_msgs —— 实验3 接口包（PickPlace action）
 
-只定义消息，不含任何业务逻辑。供甲（真机/仿真执行侧）和乙（视觉侧）共同 `find_package` / `import`，
+只定义消息，不含任何业务逻辑。供甲（**仿真**执行侧）和乙（视觉侧）共同 `find_package` / `import`，
 保证两边拿到的 `PickPlace` goal/feedback/result 字段一致。
+
+> **真机线（EP）不用这个包**：EP 走 Python SDK 直连，没有 ROS2，因此 `PickPlace` 的
+> goal/阶段/reason 语义以**代码契约**的形式复用（`ros2/task_control/exec_contract.py` 的
+> `PickExecutor` ABC，故意写成 ROS-free），而不是以 ROS 消息的形式。
+> 语义仍然是同一份，见 [`contract/PickPlace.action`](../../contract/PickPlace.action)。
 
 权威语义注释见 [`contract/PickPlace.action`](../../contract/PickPlace.action)，本目录 `.action` 为同内容的精简拷贝。
 
-## 构建（甲，Jetson / 或有 ROS2 的机器）
+## 构建（甲，装了 ROS2 的仿真机）
 
 ```bash
 cd ~/ws_mecharm/src        # 或用你建仿真包的那个 workspace

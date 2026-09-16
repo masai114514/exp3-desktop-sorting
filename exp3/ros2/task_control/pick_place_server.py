@@ -7,7 +7,8 @@ result=success+reason+detail；reason 对齐 sort_core/taxonomy.py 动作级枚�
 
 设计：把『一次取放』拆成固定 6 个阶段，每进入一段先发 feedback 再交给 **PickExecutor**
 （exec_contract.py，ROS-free）。A/B 已由 resolve_goal 按 config 解算好放 ctx。
-Jetson 侧执行者实现见 c4_executor.py（用 c4_2 直驱原语）——本文件不含任何关节/规划代码，
+这是**仿真线**的 server（真机线是 EP，不走 ROS2，见 real/ep_backend.py）。
+仿真执行者实现见 c4_executor.py（用 c4_2 直驱原语）——本文件不含任何关节/规划代码，
 可先审时序与 reason 映射；--executor stub 做离线冒烟。
 
 跑法（在 mecharm-grasp-exp/exp3 下，先 source 工作区使 sort_msgs 可用）：
@@ -113,7 +114,7 @@ class PickPlaceServer(Node):
 
 
 class _StubExecutor(PickExecutor):
-    """离线冒烟用：假成功推进各段（Jetson 换 c4_executor.C4PickExecutor）。"""
+    """离线冒烟用：假成功推进各段（仿真上图换 c4_executor.C4PickExecutor）。"""
     def descend(self, ctx): return True, 'stub descend A=%s' % ctx['A']
     def grasp(self, ctx): return True, 'stub grasp'
     def lift(self, ctx): return True, 'stub lift(held assumed)'

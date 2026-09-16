@@ -239,33 +239,282 @@ def check_all(task, grid, bins):
             + check_camera(task, grid, bins))
 
 
-def _load(name):
-    with open(os.path.join(_CONFIG_DIR, name), encoding='utf-8') as f:
+def _load(name, config_dir=None):
+    with open(os.path.join(config_dir or _CONFIG_DIR, name), encoding='utf-8') as f:
         return json.load(f)
+
+
+def _issue(sev, who, msg):
+    return dict(severity=sev, who=who, msg=msg)
+
+
+# ---------- 真机线：EP 执行侧标定表 ----------
+# 臂 moveto 的宽松上界(mm)。官方行程 水平 ~0.22m / 垂直 ~0.15m, 这里只拦明显写错的量级
+# （和 ep/core/selfcheck.py 同一口径, 真正的到位值靠现场 jog 试出来）。
+ARM_RANGE_MM = 500
+GRIP_POWER = (1, 100)
+EP_ARM_KEYS = ('grab_low_mm', 'lift_high_mm', 'release_low_mm')
+# 必须实填的臂姿态。release_low_mm **不在**这里: null 它有确定含义(= 与 grab_low 同高,
+# 见 config_real/ep_waypoints.json 的 _release_note), 是部署选择而不是"还没量" ——
+# 料盒面高与桌面一致时本来就不该再标一个值出来。
+EP_ARM_REQUIRED = ('grab_low_mm', 'lift_high_mm')
+EP_JUDGE_VALUES = ('operator_confirm', 'assume_ok')
+
+
+def _pose3(v):
+    return isinstance(v, list) and len(v) == 3 and all(_num(x, 'p') for x in v)
+
+
+def _xy2(v):
+    return isinstance(v, list) and len(v) == 2 and all(_num(x, 'p') for x in v)
+
+
+def check_ep_waypoints(ep, grid=None, bins=None):
+    """ep_waypoints.json 结构与对齐检查（未标定项 null 合法 —— 那道闸在 check_calibration）。
+
+    主要防的是**键对不上**：cell_pose 少一个 c6、bin_pose 拼成 bin_cup2、arm 键名写成
+    grab_low（少了 _mm）。这类错不会在启动时暴露，而是跑到第 5 个物体、或者第一次换料盒时
+    才当场炸 —— 现场时间最贵，提前在这里按 grid/bins 的 id 对齐一遍。
+    """
+    out = []
+    if not isinstance(ep, dict):
+        return [_issue(ERROR, 'ep', '内容不是 JSON 对象')]
+    for k in ('chassis', 'arm', 'gripper', 'cell_pose', 'bin_pose', 'judge', 'calibration'):
+        if k not in ep:
+            out.append(_issue(ERROR, 'ep', '缺顶层键: %s' % k))
+    cells = (grid or {}).get('cells') or []
+    bins_d = (bins or {}).get('bins') or {}
+
+    # 底盘位姿：每个格/每个料盒都要有键（值可以为 null = 未标定）
+    for ep_key, want, who in (('cell_pose', [c.get('id') for c in cells], '格'),
+                              ('bin_pose', list(bins_d.keys()), '料盒')):
+        m = ep.get(ep_key)
+        if not isinstance(m, dict):
+            out.append(_issue(ERROR, 'ep', '%s 缺失或不是对象' % ep_key))
+            continue
+        for wid in want:
+            if wid not in m:
+                out.append(_issue(ERROR, 'ep', '%s 缺 %s %r —— 任务跑到它时会当场失败'
+                                           % (ep_key, who, wid)))
+            elif m[wid] is not None and not _pose3(m[wid]):
+                out.append(_issue(ERROR, 'ep', '%s[%r] 应为 [x_m, y_m, z_deg] 三元组或 null: %r'
+                                           % (ep_key, wid, m[wid])))
+        for k in m:
+            if k != '_note' and k not in want:
+                out.append(_issue(WARN, 'ep', '%s 有多余键 %r（grid/bins 里没这个 id，'
+                                           '拼错了？）' % (ep_key, k)))
+    ch = ep.get('chassis') or {}
+    if ch.get('home_pose') is not None and not _pose3(ch.get('home_pose')):
+        out.append(_issue(ERROR, 'ep', 'chassis.home_pose 应为三元组或 null: %r'
+                                       % (ch.get('home_pose'),)))
+    if not _num(ch.get('move_tol_m'), 'tol') or not (0 < ch.get('move_tol_m', 0) < 0.2):
+        out.append(_issue(WARN, 'ep', 'chassis.move_tol_m 建议 0.01..0.2（底盘开环，给太紧会'
+                                      '一直补正）: %r' % ch.get('move_tol_m')))
+
+    # 臂姿态
+    am = ep.get('arm') or {}
+    for k in EP_ARM_KEYS:
+        v = am.get(k)
+        if v is None:
+            continue
+        if not _xy2(v):
+            out.append(_issue(ERROR, 'ep', 'arm.%s 应为 [x_mm, y_mm] 或 null: %r' % (k, v)))
+            continue
+        for x in v:
+            if abs(x) > ARM_RANGE_MM:
+                out.append(_issue(ERROR, 'ep', 'arm.%s(%smm) 超出宽松界 ±%dmm —— 超官方行程会被'
+                                               '钳制' % (k, x, ARM_RANGE_MM)))
+    if _xy2(am.get('grab_low_mm')) and tuple(am['grab_low_mm']) == tuple(am.get('lift_high_mm') or ()):
+        out.append(_issue(ERROR, 'ep', 'arm.grab_low_mm == lift_high_mm：没有下探行程，'
+                                       '两档高度要分别 jog 标定'))
+
+    # 夹爪
+    gp = ep.get('gripper') or {}
+    for k in ('open_power', 'close_power'):
+        v = gp.get(k)
+        if not (isinstance(v, int) and not isinstance(v, bool)
+                and GRIP_POWER[0] <= v <= GRIP_POWER[1]):
+            out.append(_issue(ERROR, 'ep', 'gripper.%s=%r 应取整数 %d..%d'
+                                           % (k, v, GRIP_POWER[0], GRIP_POWER[1])))
+
+    # 判据
+    jd = ep.get('judge') or {}
+    for k in ('held', 'placed'):
+        if jd.get(k) not in EP_JUDGE_VALUES:
+            out.append(_issue(ERROR, 'ep', 'judge.%s=%r 应为 %s 之一（EP 无物块感知，'
+                                           'assume_ok 只给离线演练）'
+                                           % (k, jd.get(k), '/'.join(EP_JUDGE_VALUES))))
+
+    cal = ep.get('calibration')
+    if not isinstance(cal, dict) or cal.get('status') not in ('calibrated', 'uncalibrated'):
+        out.append(_issue(ERROR, 'ep', 'calibration.status 应为 calibrated/uncalibrated: %r'
+                                       % (cal or {}).get('status')))
+    return out
+
+
+# ---------- 真机线：未标定拒跑闸门 ----------
+# 占位标记：_note 里还留着这些词 = 那一项的坐标还是从模板抄的，没人量过。
+# 为什么不能只靠数值域判：占位值**是合法数值**，能过 check_grid/check_bins/check_camera 的
+# 全部检查。实验二就栽在这 —— config_ep.json 里编的 A/B 恰好通过全部结构检查，"是否已标定"
+# 这条从来没有真正起过作用（见 ep/core/selfcheck.py check_calibrated 的注释）。
+_PLACEHOLDER_MARKS = ('示例', '待回填', 'placeholder', 'TODO')
+
+
+def _markers(notes):
+    """[(标签, 文本)] 里还留着占位标记的 → [标签]。"""
+    return [label for label, txt in notes
+            if isinstance(txt, str) and any(m in txt for m in _PLACEHOLDER_MARKS)]
+
+
+def check_calibration(task, grid, bins, ep=None):
+    """真机驱动前的硬闸门：识别 / 几何 / EP 三侧的现场标定都做完了吗。
+
+    刻意与 check_all 分开，因为**仿真线必须能在未标定时照跑**（甲的场景就是从 config/ 里的
+    占位几何起步的）。所以：
+      - config_check.py 默认只把标定状态当**提示**打印（同 ep/core/selfcheck.py 的做法）；
+      - --require-calibrated 才把它算失败 —— run_real.py 走这条，拒绝启动时连机器人都不连。
+
+    三处**分别**记标定状态是刻意的：相机标定是乙的活、网格/料盒是现场卷尺量的、EP 位姿是
+    组长 jog 出来的。分开记才知道卡在谁那里，也才能只在某一项上返工。
+    """
+    out = []
+    # 1) 相机（乙）
+    cam = (task or {}).get('camera') or {}
+    calib = cam.get('calib') or {}
+    ccal = cam.get('calibration')
+    if not isinstance(ccal, dict):
+        out.append(_issue(ERROR, 'camera',
+                          'task.json camera 里没有 calibration 块 —— 这份 config 不是真机线'
+                          '（config_real/）的，或者标定记录还没建'))
+    else:
+        if ccal.get('status') != 'calibrated':
+            out.append(_issue(ERROR, 'camera',
+                              'calibration.status=%r ≠ "calibrated" —— 相机标定没做完（乙）'
+                              % ccal.get('status')))
+        for k in ('by', 'date', 'venue'):
+            if not ccal.get(k):
+                out.append(_issue(ERROR, 'camera', 'calibration.%s 为空（标定人/日期/场地要'
+                                                   '留档）' % k))
+    mk = _markers([('camera.calib', calib.get('_note'))])
+    if mk:
+        out.append(_issue(ERROR, 'camera', '仍留着占位标记：%s —— 把标定值填进 calib 并删掉 '
+                                           '_note（真机斜俯视支架多半要换成 mode=homography）'
+                                           % '、'.join(mk)))
+
+    # 2) 网格（现场量）
+    gcal = (grid or {}).get('calibration')
+    if not isinstance(gcal, dict) or gcal.get('status') != 'calibrated':
+        out.append(_issue(ERROR, 'grid', 'grid_cells.json 未标定（calibration.status=%r）—— '
+                                         '现场卷尺量出每格两角坐标回填 x0/y0/x1/y1'
+                                         % (gcal or {}).get('status')))
+    mk = _markers([('cell %s' % c.get('id'), c.get('_note'))
+                   for c in ((grid or {}).get('cells') or [])])
+    if mk:
+        out.append(_issue(ERROR, 'grid', '仍留着占位标记：%s —— 删掉各 cell 的 _note，'
+                                         '坐标没量过就别改 status' % '、'.join(mk)))
+
+    # 3) 料盒（现场量）
+    bcal = (bins or {}).get('calibration')
+    if not isinstance(bcal, dict) or bcal.get('status') != 'calibrated':
+        out.append(_issue(ERROR, 'bins', 'bins.json 未标定（calibration.status=%r）—— 现场量'
+                                         '料盒中心坐标回填 x_m/y_m'
+                                         % (bcal or {}).get('status')))
+    mk = _markers([('bin %s' % b, b_.get('_note'))
+                   for b, b_ in (((bins or {}).get('bins') or {}).items())])
+    if mk:
+        out.append(_issue(ERROR, 'bins', '仍留着占位标记：%s —— 删掉各 bin 的 _note'
+                                         % '、'.join(mk)))
+
+    # 4) EP 执行侧（组长）—— 只在这一侧能用 null 表达"没标定"
+    if ep is None:
+        out.append(_issue(ERROR, 'ep', '没有 ep_waypoints.json —— 真机执行侧位姿表缺失，'
+                                       'run_real.py 无从知道该把 EP 开到哪'))
+        return out
+    ecal = ep.get('calibration')
+    if not isinstance(ecal, dict) or ecal.get('status') != 'calibrated':
+        out.append(_issue(ERROR, 'ep', 'ep_waypoints.json 未标定（calibration.status=%r）—— '
+                                       '按 ep/标定说明.md 现场标 EP 位姿'
+                                       % (ecal or {}).get('status')))
+    else:
+        for k in ('by', 'date', 'venue'):
+            if not ecal.get(k):
+                out.append(_issue(ERROR, 'ep', 'calibration.%s 为空（换场地/重新上电必须重标，'
+                                               '要能查到是谁什么时候标的）' % k))
+    ch = ep.get('chassis') or {}
+    if ch.get('home_pose') is None:
+        out.append(_issue(ERROR, 'ep', 'chassis.home_pose 仍是 null（未标定）—— 用 '
+                                       'ep/drive/env_check.py --odom 读 odom 回填'))
+    for ep_key in ('cell_pose', 'bin_pose'):
+        miss = [k for k, v in (ep.get(ep_key) or {}).items()
+                if k != '_note' and v is None]
+        if miss:
+            out.append(_issue(ERROR, 'ep', '%s 有 %d 个位姿还是 null：%s'
+                                       % (ep_key, len(miss), '、'.join(sorted(miss)))))
+    miss = [k for k in EP_ARM_REQUIRED if (ep.get('arm') or {}).get(k) is None]
+    if miss:
+        out.append(_issue(ERROR, 'ep', 'arm 还有未标定项：%s —— 用 '
+                                       'ep/drive/env_check.py --jog 逐档试出来'
+                                       % '、'.join(miss)))
+    return out
+
+
+def check_all_with_ep(task, grid, bins, ep=None):
+    """结构/数值域全量（含 EP 位姿表）。标定闸门是另一件事 —— check_calibration。"""
+    return check_all(task, grid, bins) + check_ep_waypoints(ep, grid, bins)
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description='exp3 config 回填自检')
-    ap.add_argument('--config-dir', default=_CONFIG_DIR)
+    ap.add_argument('--config-dir', default=_CONFIG_DIR,
+                    help='config 目录（仿真线 config/ | 真机线 config_real/）')
     ap.add_argument('--strict', action='store_true', help='WARN 也算失败')
+    ap.add_argument('--require-calibrated', action='store_true',
+                    help='标定未做完即失败 —— 真机驱动前必须过（run_real.py 同口径）')
     a = ap.parse_args(argv)
 
     try:
-        task = _load('task.json'); grid = _load('grid_cells.json'); bins = _load('bins.json')
+        task = _load('task.json', a.config_dir)
+        grid = _load('grid_cells.json', a.config_dir)
+        bins = _load('bins.json', a.config_dir)
     except FileNotFoundError as e:
         print('读 config 失败: %s（--config-dir 指定别的目录？）' % e)
         return 2
+    # ep_waypoints.json 只有真机线有；仿真线目录里没有 → ep=None，标定闸门会如实报"缺失"
+    ep_path = os.path.join(a.config_dir, 'ep_waypoints.json')
+    ep = _load('ep_waypoints.json', a.config_dir) if os.path.exists(ep_path) else None
 
-    issues = check_all(task, grid, bins)
-    if not issues:
-        print('config 自检：全部通过（grid/bins/camera/cross 契约一致）')
-        return 0
+    issues = check_all_with_ep(task, grid, bins, ep) if ep is not None \
+        else check_all(task, grid, bins)
+
     n_err = sum(1 for it in issues if it['severity'] == ERROR)
     for it in issues:
         print('[%s] %-6s %s' % (it['severity'], it['who'], it['msg']))
-    print('共 %d 项问题（ERROR %d / WARN %d）'
-          % (len(issues), n_err, len(issues) - n_err))
-    fail = n_err > 0 or (a.strict and issues)
+    if not issues:
+        print('config 自检：全部通过（grid/bins/camera/cross 契约一致%s）'
+              % ('/ep 位姿表' if ep is not None else ''))
+    else:
+        print('共 %d 项问题（ERROR %d / WARN %d）'
+              % (len(issues), n_err, len(issues) - n_err))
+
+    # 标定闸门只在真机线有意义：仿真线（config/）没有 ep_waypoints.json，它本来就该在
+    # 占位几何上跑 —— 那种情况下不打扰。--require-calibrated 例外：那时"缺位姿表"本身
+    # 就是要报出来的错。
+    if ep is None and not a.require_calibrated:
+        return 1 if (n_err > 0 or (a.strict and issues)) else 0
+
+    cal = check_calibration(task, grid, bins, ep)
+    if not cal:
+        c = (task.get('camera') or {}).get('calibration') or {}
+        print('标定状态：已标定（by=%s date=%s venue=%s）' % (c.get('by'), c.get('date'),
+                                                              c.get('venue')))
+    else:
+        head = '未标定' if a.require_calibrated \
+            else '未标定（真机线 run_real.py 会拒绝启动）'
+        print('\n⚠ %s —— %d 项：' % (head, len(cal)))
+        for it in cal:
+            print('  [%s] %-6s %s' % (it['severity'], it['who'], it['msg']))
+
+    fail = n_err > 0 or (a.strict and issues) or (a.require_calibrated and bool(cal))
     return 1 if fail else 0
 
 

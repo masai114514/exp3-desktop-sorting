@@ -2,10 +2,17 @@
 #
 # 语义：把 cell_id 网格里的物体抓起来，按类别放进对应料盒，再退回安全位。
 #   goal 只给 cell_id + 期望类别 cls。取放点/高度从 config 读，不写死在 goal：
-#     取放点   = config/grid_cells.json  的该格中心(x,y) + pick_z_m/object_z_m
-#     料盒     = config/bins.json 的 class_to_bin[cls]
+#     取放点   = 该格中心 + 抓取高    料盒 = class_to_bin[cls]
 #   （对齐 docx：任务开始后不人工指定类别/网格/放置区）
+#
+#   ★ 取放点「在哪个 config 里」由执行线决定，契约本身不管坐标系：
+#     仿真线(config/)     ：该格中心(x,y) + pick_z_m/object_z_m，机器人系
+#     真机线(config_real/)：ep_waypoints.json 里按同一个 cell_id 查底盘里程计位姿
+#   两条线的 goal 完全一样（只有 id + cls），所以「换格/换料盒不改接口」。
+#   桌面系与里程计系之间没有已知关系，**也不需要建立** —— 见 real/ep_backend.py 决定 1。
+#
 # 长任务：服务端按阶段发 feedback；客户端可随时 cancel → 服务端回 aborted 并安全停止。
+# 真机线不经过 ROS 消息，但这三段的语义（goal/阶段号/reason）逐字相同，见 exec_contract.py。
 #
 # 阶段编号约定（业务常量，代码里定义，不在 action 里；.action 不支持常量）：
 #   STAGE_APPROACH=1  STAGE_GRASP=2  STAGE_LIFT=3

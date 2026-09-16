@@ -10,7 +10,12 @@ detection_d2a_node.py —— 乙的参考骨架（实验3 接口改造版检测�
 本文件是「怎么改」的模板，不是最终成品：字段命名/归一化口径等以组长为准（见
 exp3/README.md 的接口契约）。仿真联调前先在真模型上跑通 Image→Detection2DArray。
 
-构建运行（ROS2 Humble，Jetson / WSL2 均可）：
+★ 本骨架只服务**仿真线**。真机线（EP）不走 ROS2，乙那边交付的是**同一个模型的普通函数**：
+    def detect(frame) -> [{'cls': 'cup', 'conf': 0.87, 'bbox': [x1,y1,x2,y2]}]   # 像素 xyxy
+  两者识别的是同一批类、同一个 .pt，只是传输方式不同 —— 见 real/README.md「检测器接口」。
+  所以模型训练与调参只需做一次，两条线共用。
+
+构建运行（ROS2 Humble，装了 ROS2 的机器即可）：
     sudo apt install ros-humble-vision-msgs ros-humble-cv-bridge
     cd ~/ws_mecharm/src && cp detection_d2a_node.py ./ && cd ~/ws_mecharm && colcon build
     ros2 run detection_d2a_node detection_d2a_node --ros-args \
