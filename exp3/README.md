@@ -42,7 +42,7 @@
 
 ```bash
 cd mecharm-grasp-exp/exp3
-python3 -m unittest discover -s tests -t . -v   # 无需 ROS，86 个用例
+python3 -m unittest discover -s tests -t . -v   # 无需 ROS，205 个用例
 python3 examples/run_demo.py --mode happy       # 仿真线端到端：mock 桌面跑完整控制循环 → exp3_logs
 python3 config_check.py --strict                # 回填自检：甲/乙改 config 后先跑，ERROR/WARN 拦错填
 
@@ -107,7 +107,8 @@ exp3/
 │   ├── task.json / grid_cells.json / bins.json   同 schema，数值是现场实测
 │   └── ep_waypoints.json     EP 执行侧：底盘位姿 + 臂两档 + 夹爪 + 判据
 ├── config_check.py           ★ 回填自检器：结构一致性 + **真机标定闸门**（`--require-calibrated`）
-├── docs/                     提交材料：异常测试记录（docx §三/四）、依赖说明（§七.1）
+├── docs/                     提交材料：状态机规格（docx §七.3）、异常测试记录（§三/四）、依赖说明（§七.1）
+│   └── state_machine.md      状态机规格：状态/转移/阈值/去重口径；参数文件即 config*/task.json
 ├── sort_core/                ★ 任务控制纯 Python 核心（离线可测）
 │   ├── taxonomy.py           reason / verdict 常量
 │   ├── geometry.py           bbox 中心 → 桌面点 → 网格 cell（rectilinear / homography）

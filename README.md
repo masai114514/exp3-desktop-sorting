@@ -49,7 +49,7 @@ exp3/                     工程根（接口契约 + 纯 Python 任务控制核�
 
 ```bash
 cd exp3
-python3 -m unittest discover -s tests -t . -v   # 86 个用例，全绿
+python3 -m unittest discover -s tests -t . -v   # 205 个用例，全绿
 python3 examples/run_demo.py --mode happy       # mock 桌面端到端：完整控制循环 → exp3_logs/
 python3 config_check.py --strict                # 甲/乙回填 config 后先自检
 ```
