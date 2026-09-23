@@ -129,10 +129,21 @@ class DetectionD2aNode(Node):
             d.header = msg.header
             d.id = f'{cls_name}_{int(cx_px)}_{int(cy_px)}'
             d.bbox = BoundingBox2D()
-            d.bbox.center.x = cx_px / float(W)   # 归一化 [0,1]，原点左上
-            d.bbox.center.y = cy_px / float(H)
-            d.bbox.size.width = w_px / float(W)
-            d.bbox.size.height = h_px / float(H)
+            cx_norm = cx_px / float(W)            # 归一化 [0,1]，原点左上
+            cy_norm = cy_px / float(H)
+            if hasattr(d.bbox.center, 'position'):
+                d.bbox.center.position.x = cx_norm
+                d.bbox.center.position.y = cy_norm
+                d.bbox.center.theta = 0.0
+            else:
+                d.bbox.center.x = cx_norm
+                d.bbox.center.y = cy_norm
+            if hasattr(d.bbox, 'size_x'):
+                d.bbox.size_x = w_px / float(W)
+                d.bbox.size_y = h_px / float(H)
+            else:
+                d.bbox.size.width = w_px / float(W)
+                d.bbox.size.height = h_px / float(H)
 
             ohwp = ObjectHypothesisWithPose()
             ohwp.hypothesis = make_hypothesis(cls_id, cls_name, score)

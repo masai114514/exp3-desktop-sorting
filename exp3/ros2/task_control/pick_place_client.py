@@ -20,11 +20,13 @@ from sort_core.taxonomy import REASON_EXEC_ERROR, REASON_ABORTED, ACTION_REASONS
 
 
 def _spin(node, fut, timeout):
-    """给一次 send/result 的同步等待；超时返回 False。"""
+    """Wait for a future completed by the background executor, without nested spinning."""
+    from threading import Event
     if not rclpy.ok():
         return False
-    rclpy.spin_until_future_complete(node, fut, timeout_sec=timeout)
-    return fut.done() and not fut.cancelled()
+    done = Event()
+    fut.add_done_callback(lambda _future: done.set())
+    return done.wait(timeout) and fut.done() and not fut.cancelled()
 
 
 class PickPlaceActionClient(Node):
@@ -32,7 +34,7 @@ class PickPlaceActionClient(Node):
         super().__init__('pick_place_client')
         self._cli = ActionClient(self, PickPlace, action_name)
         if not self._cli.wait_for_server(timeout_sec=wait_timeout):
-            self.get_logger().error('PickPlace server 不可达: %s', action_name)
+            self.get_logger().error('PickPlace server unavailable: %s' % action_name)
 
     def ready(self):
         return self._cli.server_is_ready()

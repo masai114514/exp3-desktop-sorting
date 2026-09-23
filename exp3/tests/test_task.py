@@ -4,9 +4,10 @@ import os
 import unittest
 
 from sort_core.task import TaskController
-from sort_core.logging_util import Exp3RunLog, make_run_dir
+from sort_core.logging_util import Exp3RunLog, make_run_dir, verdict_for
 from sort_core.taxonomy import (REASON_NO_TARGET, REASON_NO_EXEC, REASON_SAFETY_STOP,
-                                REASON_UNRECOGNIZED, REASON_OUT_OF_GRID, VERDICT_PASS)
+                                REASON_UNRECOGNIZED, REASON_OUT_OF_GRID,
+                                VERDICT_PASS, VERDICT_TRIAL)
 
 CELLS = [
     {'id': 'c1', 'row': 0, 'col': 0, 'x0': 0.0, 'y0': 0.0, 'x1': 0.1, 'y1': 0.1},
@@ -67,6 +68,32 @@ class TestAllSorted(unittest.TestCase):
         self.assertEqual(s['placed_ok'], 2)
         self.assertEqual(s['objects_seen'], 2)
         self.assertEqual(sorted(tb.picked), [('c1', 'cup'), ('c2', 'mouse')])
+
+
+class TestObjectsSeen(unittest.TestCase):
+    def test_out_of_grid_bin_detection_does_not_inflate_objects_seen(self):
+        cfg = make_cfg(expected_total=2, pass_line=1, no_exec_limit=2)
+        objects = [('c1', 'cup')]
+
+        def scan():
+            dets = [det_for_cell(cid, cls) for cid, cls in objects]
+            if not objects:
+                dets.append({'cls': 'cup', 'conf': 0.9, 'bbox': bbox_at(450, 450)})
+            return dets
+
+        def pick_place(cell_id, cls):
+            objects.remove((cell_id, cls))
+            return 'ok', 'picked+placed'
+
+        ctl = TaskController(cfg, BINS, CELLS, scan, pick_place)
+        summary = ctl.run()
+
+        self.assertEqual(summary['placed_ok'], 1)
+        self.assertEqual(summary['objects_seen'], 1)
+        self.assertEqual(
+            verdict_for(summary['placed_ok'], summary['objects_seen'],
+                        cfg['expected_total'], cfg['pass_line'], final=True),
+            VERDICT_TRIAL)
 
 
 class TestSafetyStop(unittest.TestCase):

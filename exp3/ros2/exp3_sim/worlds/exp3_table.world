@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<!-- L1 scene. Object motion during grasp is handled by an explicitly disclosed ROS service follower. -->
+<sdf version="1.6">
+  <world name="default">
+    <physics type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode><solver><type>world</type><iters>50</iters></solver></ode>
+    </physics>
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros><namespace>/gazebo</namespace></ros>
+      <update_rate>10.0</update_rate>
+    </plugin>
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <model name="exp3_table">
+      <static>true</static>
+      <link name="top">
+        <collision name="top_collision">
+          <pose>0.10 0 0.78 0 0 0</pose>
+          <geometry><box><size>0.80 0.70 0.04</size></box></geometry>
+        </collision>
+        <visual name="top_visual">
+          <pose>0.10 0 0.78 0 0 0</pose>
+          <geometry><box><size>0.80 0.70 0.04</size></box></geometry>
+          <material><ambient>0.72 0.74 0.73 1</ambient><diffuse>0.72 0.74 0.73 1</diffuse></material>
+        </visual>
+        <collision name="leg_left"><pose>-0.24 0 0.40 0 0 0</pose><geometry><box><size>0.04 0.04 0.80</size></box></geometry></collision>
+        <collision name="leg_right"><pose>0.44 0 0.40 0 0 0</pose><geometry><box><size>0.04 0.04 0.80</size></box></geometry></collision>
+        <visual name="leg_left_visual"><pose>-0.24 0 0.40 0 0 0</pose><geometry><box><size>0.04 0.04 0.80</size></box></geometry><material><ambient>0.30 0.32 0.32 1</ambient><diffuse>0.30 0.32 0.32 1</diffuse></material></visual>
+        <visual name="leg_right_visual"><pose>0.44 0 0.40 0 0 0</pose><geometry><box><size>0.04 0.04 0.80</size></box></geometry><material><ambient>0.30 0.32 0.32 1</ambient><diffuse>0.30 0.32 0.32 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="grid_lines">
+      <static>true</static>
+      <link name="lines">
+        <visual name="x0"><pose>0.065 0 0.801 0 0 0</pose><geometry><box><size>0.0015 0.24 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+        <visual name="x1"><pose>0.115 0 0.801 0 0 0</pose><geometry><box><size>0.0015 0.24 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+        <visual name="x2"><pose>0.165 0 0.801 0 0 0</pose><geometry><box><size>0.0015 0.24 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+        <visual name="y0"><pose>0.115 -0.12 0.801 0 0 0</pose><geometry><box><size>0.10 0.0015 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+        <visual name="y1"><pose>0.115 -0.04 0.801 0 0 0</pose><geometry><box><size>0.10 0.0015 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+        <visual name="y2"><pose>0.115 0.04 0.801 0 0 0</pose><geometry><box><size>0.10 0.0015 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+        <visual name="y3"><pose>0.115 0.12 0.801 0 0 0</pose><geometry><box><size>0.10 0.0015 0.0008</size></box></geometry><material><ambient>0.10 0.12 0.14 1</ambient><diffuse>0.10 0.12 0.14 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="bin_cup">
+      <static>true</static><pose>0.10 -0.16 0.80 0 0 0</pose>
+      <link name="tray">
+        <collision name="base_collision"><pose>0 0 0.002 0 0 0</pose><geometry><box><size>0.10 0.075 0.004</size></box></geometry></collision>
+        <visual name="base"><pose>0 0 0.002 0 0 0</pose><geometry><box><size>0.10 0.075 0.004</size></box></geometry><material><ambient>0.22 0.42 0.30 1</ambient><diffuse>0.22 0.42 0.30 1</diffuse></material></visual>
+        <collision name="wall_x1"><pose>-0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry></collision>
+        <collision name="wall_x2"><pose>0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry></collision>
+        <collision name="wall_y1"><pose>0  -0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry></collision>
+        <collision name="wall_y2"><pose>0 0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry></collision>
+        <visual name="wall_x1v"><pose>-0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry><material><ambient>0.22 0.42 0.30 1</ambient><diffuse>0.22 0.42 0.30 1</diffuse></material></visual>
+        <visual name="wall_x2v"><pose>0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry><material><ambient>0.22 0.42 0.30 1</ambient><diffuse>0.22 0.42 0.30 1</diffuse></material></visual>
+        <visual name="wall_y1v"><pose>0 -0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry><material><ambient>0.22 0.42 0.30 1</ambient><diffuse>0.22 0.42 0.30 1</diffuse></material></visual>
+        <visual name="wall_y2v"><pose>0 0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry><material><ambient>0.22 0.42 0.30 1</ambient><diffuse>0.22 0.42 0.30 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="bin_mouse">
+      <static>true</static><pose>0.10 0.16 0.80 0 0 0</pose>
+      <link name="tray">
+        <collision name="base_collision"><pose>0 0 0.002 0 0 0</pose><geometry><box><size>0.10 0.075 0.004</size></box></geometry></collision>
+        <visual name="base"><pose>0 0 0.002 0 0 0</pose><geometry><box><size>0.10 0.075 0.004</size></box></geometry><material><ambient>0.36 0.38 0.17 1</ambient><diffuse>0.36 0.38 0.17 1</diffuse></material></visual>
+        <collision name="wall_x1"><pose>-0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry></collision>
+        <collision name="wall_x2"><pose>0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry></collision>
+        <collision name="wall_y1"><pose>0 -0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry></collision>
+        <collision name="wall_y2"><pose>0 0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry></collision>
+        <visual name="wall_x1v"><pose>-0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry><material><ambient>0.36 0.38 0.17 1</ambient><diffuse>0.36 0.38 0.17 1</diffuse></material></visual>
+        <visual name="wall_x2v"><pose>0.048 0 0.016 0 0 0</pose><geometry><box><size>0.004 0.075 0.028</size></box></geometry><material><ambient>0.36 0.38 0.17 1</ambient><diffuse>0.36 0.38 0.17 1</diffuse></material></visual>
+        <visual name="wall_y1v"><pose>0 -0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry><material><ambient>0.36 0.38 0.17 1</ambient><diffuse>0.36 0.38 0.17 1</diffuse></material></visual>
+        <visual name="wall_y2v"><pose>0 0.0355 0.016 0 0 0</pose><geometry><box><size>0.10 0.004 0.028</size></box></geometry><material><ambient>0.36 0.38 0.17 1</ambient><diffuse>0.36 0.38 0.17 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <model name="overhead_camera">
+      <static>true</static>
+      <link name="camera_link">
+        <pose>0.10 0 1.30 0 1.57079632679 -1.57079632679</pose>
+        <sensor name="camera" type="camera">
+          <always_on>true</always_on><update_rate>10</update_rate><visualize>false</visualize>
+          <camera><horizontal_fov>1.0471975512</horizontal_fov><image><width>640</width><height>480</height><format>R8G8B8</format></image><clip><near>0.03</near><far>4.0</far></clip></camera>
+          <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+            <ros><namespace>/</namespace></ros>
+            <camera_name>overhead</camera_name>
+            <frame_name>overhead_camera_link</frame_name>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+  </world>
+</sdf>

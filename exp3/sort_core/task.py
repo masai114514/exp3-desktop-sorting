@@ -52,6 +52,7 @@ class TaskController:
         reasons = Counter()
         placed_ok = 0
         done_cells = set()          # 已成功处理完的网格，不再二次取放
+        seen_cells = set()          # 曾检测到可执行目标的唯一网格
         logged_skip = set()         # 已记录过的跳过项：(cell_id, cls)
         fail_streak = 0
         no_exec_streak = 0
@@ -78,6 +79,7 @@ class TaskController:
                         self._record(decision='skip', cell_id=(cell['id'] if cell else None),
                                      cls=dec['cls'], conf=dec['conf'], skip_reason=dec['reason'])
                     continue
+                seen_cells.add(cell['id'])
                 if cell['id'] in done_cells:
                     continue
                 executable.append(dec)
@@ -119,16 +121,13 @@ class TaskController:
             exit_status = REASON_NO_EXEC
             reasons[REASON_NO_EXEC] += 1
 
-        # 结束时再扫一次，估计仍留在桌上的物体数（用于 objects_seen 口径）
-        residual = len(self.scan() or [])
-
         summary = {
             'placed_ok': placed_ok,
-            'objects_seen': placed_ok + residual,
+            'objects_seen': len(seen_cells),
             'exit_status': exit_status,
             'reasons': dict(reasons),
         }
         if self.log:
-            self.log.text('exit_status=%s placed_ok=%d residual=%d reasons=%s'
-                          % (exit_status, placed_ok, residual, dict(reasons)))
+            self.log.text('exit_status=%s placed_ok=%d objects_seen=%d reasons=%s'
+                          % (exit_status, placed_ok, len(seen_cells), dict(reasons)))
         return summary

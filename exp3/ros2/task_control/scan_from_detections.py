@@ -27,10 +27,20 @@ def dets_from_msg(msg, img_w, img_h):
     """Detection2DArray → [ {cls, conf, bbox:[x1,y1,x2,y2]} ]（像素）。"""
     out = []
     for d in msg.detections:
-        cx = _norm_to_px(d.bbox.center.x, img_w)
-        cy = _norm_to_px(d.bbox.center.y, img_h)
-        w = _norm_to_px(d.bbox.size.width, img_w)
-        h = _norm_to_px(d.bbox.size.height, img_h)
+        center = d.bbox.center
+        if hasattr(center, 'position'):
+            cx_norm, cy_norm = center.position.x, center.position.y
+        else:
+            cx_norm, cy_norm = center.x, center.y
+        if hasattr(d.bbox, 'size_x'):
+            width_norm, height_norm = d.bbox.size_x, d.bbox.size_y
+        else:
+            width_norm = d.bbox.size.width
+            height_norm = d.bbox.size.height
+        cx = _norm_to_px(cx_norm, img_w)
+        cy = _norm_to_px(cy_norm, img_h)
+        w = _norm_to_px(width_norm, img_w)
+        h = _norm_to_px(height_norm, img_h)
         if not d.results:
             continue
         hyp = d.results[0].hypothesis

@@ -1,5 +1,5 @@
 {
-  "_comment": "任务参数。camera.calib: rectilinear = 正俯视仿射映射(px->米); homography = 透视 3x3。★甲 M1 前把真实标定回填; 未标定时几何测试用合成的 calib。",
+  "_comment": "仿真任务参数。正俯视标定由 Gazebo 场景已知格心的实际图像投影测得。",
   "classes": ["cup", "mouse"],
   "expected_total": 6,
   "pass_line": 5,
@@ -13,8 +13,8 @@
     "image_height_px": 480,
     "calib": {
       "mode": "rectilinear",
-      "offset_px": [320.0, 240.0],
-      "scale_px_per_m": [1000.0, 1000.0]
+      "offset_px": [166.8, 240.0],
+      "scale_px_per_m": [1180.0, 1162.5]
     }
   }
 }
