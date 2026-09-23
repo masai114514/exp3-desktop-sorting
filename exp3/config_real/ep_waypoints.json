@@ -8,13 +8,13 @@
     "note": "★真机硬闸门。cell_pose/bin_pose/arm 三处填完 + 上面 by/date/venue 填全 + status 改 calibrated, run_real.py 才启动。换场地/重新上电必须重标底盘并把 status 打回 uncalibrated —— odom 原点跟着上电位姿走(见 ep/config_ep.json chassis.odom_cs=1 的说明)。"
   },
   "chassis": {
-    "_note": "位姿是底盘里程计读数 [x_m, y_m, z_deg](x 前 / y 左 / z 旋转)。读法: 手推/遥控把 EP 摆到位 → python3 ep/drive/env_check.py --config ep/config_ep.json --odom 读当前 odom。标定和运行必须同口径(cs=1, 以上电位姿为原点)。",
+    "_note": "位姿是底盘里程计读数 [x_m, y_m, z_deg](x 前 / y 左 / z 旋转)。读法: 手推/遥控把 EP 摆到位 → python3 real/calibrate.py --odom 看读数 → python3 real/calibrate.py --record <槽名> 直接写回。标定和运行必须同口径(cs=1, 以上电位姿为原点) ⇒ 重新上电后这张表全废, 跑 --invalidate 再重标。步骤见 real/标定说明.md §1。",
     "home_pose": null,
     "move_tol_m": 0.03,
     "_move_tol_note": "goto() 每段读 odom 做误差纠正的容差; 底盘是开环定位, 给太紧会一直补正。0.03m 沿用实验二。"
   },
   "arm": {
-    "_note": "2 轴并联臂末端 [x_mm(前), y_mm(上)]。用 python3 ep/drive/env_check.py --config ep/config_ep.json --jog 在机上试: 人盯着爪底, 试到 grab_low 爪指正好包住目标物、lift_high 爪底高于目标物顶面。★别照抄 0 —— 实验二实测校准后臂的 x 在几十 mm 量级(x≈74)。",
+    "_note": "2 轴并联臂末端 [x_mm(前), y_mm(上)], 是**2 元列表不是标量**。用 python3 real/calibrate.py --record-arm <grab|lift|release> <x> <y> 在机上试: 人盯着爪底, 试到 grab_low 爪指正好包住目标物、lift_high 爪底高于目标物顶面。★别照抄 0 —— 实验二实测校准后臂的 x 在几十 mm 量级(x≈74)。★越界指令会被 SDK 安静钳制且只打 WARN, 所以该命令会核对读回值, 差 >3mm 直接拒绝记录(见 real/标定说明.md §2)。",
     "grab_low_mm": null,
     "lift_high_mm": null,
     "release_low_mm": null,

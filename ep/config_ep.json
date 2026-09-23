@@ -1,0 +1,59 @@
+{
+  "profile": "ep_engineering_gripper",
+  "description": "RoboMaster EP 工程形态真机 A->B 定点取放 (夹爪为主, 云台/步兵不参与)。任务与验收口径同 c4_2: A->B 定点取放, 5 次连续>=4 成功。真机实际目标物 = 矿泉水瓶(约 550mL 塑料瓶)、放地面(2026-09-14 更正); 仿真侧(mechArm 270)才是 5cm 方块/桌面。所有真机数值由持机队友在标定阶段填写/校准(标定说明.md)。",
+  "calibration": {
+    "status": "uncalibrated",
+    "by": null,
+    "date": null,
+    "venue": null,
+    "note": "★现场标定闸门。按 标定说明.md §1(底盘 HOME/A/B 读 odom) §2(臂 grab_low/lift_high 用 --jog 试) §3(夹爪 power 试夹)全部填完后, 才把 status 改成 'calibrated' 并填 by/date/venue。未改之前 ep_cycle.py **拒绝启动** —— 防的就是拿示例占位值上真机。换场地/换开机要重标底盘并把 status 打回 uncalibrated。"
+  },
+  "robot": {
+    "conn_type": "ap",
+    "conn_note": "'ap' = 直连 EP 自带热点; 'sta' = 同一路由器(多机/信号稳时用)。按持机现场改。"
+  },
+  "chassis": {
+    "unit": "m_deg",
+    "note": "waypoint 为底盘里程计坐标(x 前 / y 左 / z 旋转 deg), goto() 每段读当前 odom 做误差纠正; 里程计有漂移, 每轮从 HOME_pose 出发可把误差归零一部分。三组坐标**已置 null = 未标定**(原先的 [0,0,0]/[0.35,0,0]/[0.35,0.6,0] 是编的示例值, 已删除 —— 里程计读数没有可推断的默认值)。读法见 标定说明.md §1 与 env_check.py --odom; 每次开机/换场地都要重读。",
+    "HOME_pose": null,
+    "A_pose": null,
+    "B_pose": null,
+    "odom_cs": 1,
+    "odom_cs_note": "里程计原点口径, 直接对应 SDK sub_position(cs=...): 1 = 以**上电**位姿为原点(本实验用这个 —— 标定读的 HOME/A/B 就是上电累计值), 0 = 以订阅那一刻的位置为原点。**标定与运行必须同口径**, 否则三组坐标会整体平移。",
+    "sub_freq_hz": 5,
+    "sub_freq_note": "位置订阅频率(官方允许 1/5/10/20/50)。位置只能订阅推送, 没有同步 getter, 所以这个频率就是读数的更新率; 5Hz = 200ms 一个样本。",
+    "xy_speed": 0.5,
+    "z_speed": 60.0,
+    "move_tol_m": 0.03,
+    "place_manual_tol_note": "B 落点精度靠人工判: 目标物(真机=矿泉水瓶)落在 B 靶圈内即算。如需自动判据, 用 EP 红外深度/视觉另行开发(骨架未含)。"
+  },
+  "arm": {
+    "unit": "mm_xy",
+    "note": "2 轴并联臂末端 x(前)/y(上), 单位 mm。同一低点姿态在 A、B 各用一次(grab 与 release 面高一致时)。面高不同请开 'B_low 覆盖'。**下方两档仍是待试的起猜值, 不是标定值**: 用 env_check.py --jog 在机上走一遍、人盯着看爪到哪, 对不上就改这里再跑, 直到 lift_high 爪底高于目标物顶面 / grab_low 爪指正好包住目标物(真机=瓶子, 比方块高得多, 这两档必须按瓶子重标)。x 别照抄 0 —— 标定后臂的实测 x 在几十 mm 量级(2026-09-13 实测校准后为 x≈74), 目标 x 离实际位置太远等于白走一段。",
+    "attr_candidates": ["robotic_arm", "arm"],
+    "grab_low": [0, 60],
+    "lift_high": [0, 150],
+    "release_low_override": null,
+    "lift_wait_s": 1.0,
+    "drop_wait_s": 1.0
+  },
+  "gripper": {
+    "note": "open/close 的 power 官方范围 1..100(速度/力度档)。夹目标物从 60 起步(此值原按 5cm 方块给; 真机是圆瓶身、更滑, 需现场重试), 夹稳且不啸叫即可, 不必拉满。60 是**起点不是结论**: §3 试夹后按'夹稳不掉'/'不憋电机'上下调, 调完的值写回这里。",
+    "open_power": 60,
+    "close_power": 60,
+    "act_wait_s": 1.5,
+    "hold_closed_while_carry": true
+  },
+  "judge": {
+    "held": "operator_confirm",
+    "placed": "operator_confirm",
+    "note": "EP 无物块位姿感知(红外/视觉感知未在骨架范围); 夹起/放正均人工确认(每周期问两次 y/n)。pause_each_phase=true 首跑必开。"
+  },
+  "cycle": {
+    "cycles": 1,
+    "pause_each_phase": true,
+    "retry_grab": 1,
+    "note": "验收跑 cycles=5, 连续>=4 成功; 首跑 cycles=1 + pause_each_phase 盯全程。"
+  },
+  "log_dir": null
+}

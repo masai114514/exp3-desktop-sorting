@@ -3,3 +3,7 @@ __pycache__/
 exp3_logs/
 .pytest_cache/
 .DS_Store
+
+# 识别权重：22MB 二进制，随包分发不入库（见 实验3_真机线_队友清单 的权重那节）
+weights/*.pt
+weights/*.onnx

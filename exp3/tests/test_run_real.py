@@ -15,6 +15,7 @@ import os
 import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 from real import run_real
 
@@ -153,6 +154,10 @@ class TestDryRunHappyPath(unittest.TestCase):
         self.assertTrue(ctx['dry_run'])
         self.assertGreater(ctx['dry_run_primitive_calls'], 0)
         self.assertEqual(ctx['calibration']['ep']['by'], BY)
+        # ★证据等级是**算出来的**，不靠人记：dry-run 必然是 rehearsal
+        self.assertEqual(ctx['evidence_grade'], 'rehearsal')
+        self.assertIn('dry_run', ctx['rehearsal_reasons'])
+        self.assertEqual(ctx['outcome'], 'ran')
 
     def test_records_carry_judgement_provenance(self):
         with tempfile.TemporaryDirectory() as td:
@@ -275,6 +280,88 @@ class TestAbnormal(unittest.TestCase):
         self.assertEqual(res['reasons'].get('grasp_failed'), 3)   # = fail_limit
         self.assertEqual(res['verdict'], 'FAIL')
         self.assertEqual(sum('HELD' in q for q in closes), 6)     # 3 轮 × (首次 + 重抓)
+
+
+class TestEvidenceGrade(unittest.TestCase):
+    """三个开关各自都够不上验收凭据 —— 等级由代码算出来落盘，别靠人记。"""
+
+    def _run_confirm_each(self, typed):
+        """跑一轮 --confirm-each，把操作员输入固定成 `typed`，返回 (code, out, res, ctx, prompts)。"""
+        prompts = []
+        with mock.patch('builtins.input',
+                        side_effect=lambda *a, **k: (prompts.append(a[0] if a else ''), typed)[1]):
+            with mock.patch.object(run_real, '_ask_stdin', lambda q: True):   # HELD/PLACED 放行
+                with tempfile.TemporaryDirectory() as td:
+                    make_calibrated_config(td)
+                    logd = os.path.join(td, 'logs')
+                    code, out = run_main(['--config-dir', td, '--dry-run', '--camera', 'none',
+                                          '--detector', 'mock', '--assume-judge', '--no-pause',
+                                          '--confirm-each', '--log-dir', logd])
+                    rd = find_run_dir(logd)
+                    return (code, out, read_json(os.path.join(rd, 'result.json')),
+                            read_json(os.path.join(rd, 'real_run.json')), prompts)
+
+    def test_confirm_each_is_rehearsal_and_pauses_per_object(self):
+        """--confirm-each：每个物体动手**前**等一次回车（不是事后问），整轮降级 rehearsal。"""
+        code, out, res, ctx, prompts = self._run_confirm_each('')
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(ctx['evidence_grade'], 'rehearsal')
+        # 一次开了两个：dry-run 与 confirm-each 都要如实列出来
+        self.assertIn('confirm_each', ctx['rehearsal_reasons'])
+        self.assertIn('dry_run', ctx['rehearsal_reasons'])
+        self.assertTrue(ctx['confirm_each'])
+        # 6 个物体 → 6 次"动手前等回车"（--no-pause 已关掉开局那次）
+        self.assertEqual(len([p for p in prompts if '回车执行' in p]), 6)
+
+    def test_confirm_each_can_abort_before_acting(self):
+        """输入 q → 中止整轮并走安全收尾（不是把这一格跳过继续跑）。"""
+        code, out, res, ctx, _ = self._run_confirm_each('q')
+
+        self.assertEqual(code, 1)
+        self.assertEqual(res['exit_status'], 'aborted')
+        self.assertEqual(res['placed_ok'], 0)
+        self.assertEqual(ctx['outcome'], 'ran')                # 跑了，只是被中止
+
+
+class TestConnectFailure(unittest.TestCase):
+    """连不上 EP ≠ 跑了失败：目录里要留下可分辨的两种记录。"""
+
+    def test_connect_error_records_a_run_that_never_happened(self):
+        from real import ep_conn
+        old = ep_conn.connect
+
+        def boom(*a, **k):
+            raise ep_conn.EPConnectError('连不上 EP —— 假测试\n  排查: ① …')
+
+        ep_conn.connect = boom
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                make_calibrated_config(td)
+                logd = os.path.join(td, 'logs')
+                # ★故意**不**加 --dry-run：dry-run 走假 EP，永远碰不到这条路径
+                code, out = run_main(['--config-dir', td, '--camera', 'none',
+                                      '--detector', 'mock', '--assume-judge', '--no-pause',
+                                      '--log-dir', logd])
+                rd = find_run_dir(logd)
+                res = read_json(os.path.join(rd, 'result.json'))
+                ctx = read_json(os.path.join(rd, 'real_run.json'))
+        finally:
+            ep_conn.connect = old
+
+        self.assertEqual(code, 1)
+        self.assertIn('没有执行任何动作', out)
+        # result.json 存在且 schema 与仿真线一致 —— 不能只有 run.log
+        self.assertEqual(res['placed_ok'], 0)
+        self.assertEqual(res['objects_seen'], 0)
+        self.assertEqual(res['exit_status'], 'no_exec')
+        self.assertEqual(res['verdict'], 'TRIAL')
+        # 与"跑挂了"区分开
+        self.assertEqual(ctx['outcome'], 'connect_failed')
+        self.assertIn('假测试', ctx['connect_error'])
+        self.assertIsNone(ctx['judge'])              # 没建执行者
+        self.assertIsNone(ctx['operator_confirms'])
+        self.assertNotIn('dry_run_primitive_calls', ctx)   # 没连上，也没假 EP
 
 
 class TestScanSeam(unittest.TestCase):

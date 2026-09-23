@@ -17,6 +17,19 @@
 拿没标定的点位跑，轻则空抓重则撞桌。所以这里把它前置成硬门，并且不在同一个进程里给"跳过
 闸门"的选项 —— 要跳过只能去改 config 里的标定记录，那是留痕的。
 
+**标定**用 `real/calibrate.py`（读数直接写进 ep_waypoints.json，不用手抄）；步骤见
+`real/标定说明.md`。
+
+**连不上 EP 不算"跑了失败"**：那种情况也留一份 `result.json`（`placed_ok=0`、
+`exit_status=no_exec`），另外在 `real_run.json` 里记 `outcome=connect_failed` 与错误原文 ——
+否则目录里只有 run.log、没有 result.json，"没连上"和"跑挂了"从文件上分不出来（实验二
+实验二 `ep/标定说明.md` §4.5 的教训，实验三抄在 `real/标定说明.md` §6.5）。
+
+**三个开关会让本次运行不算验收凭据**（`--dry-run` / `--assume-judge` / `--confirm-each`）：
+它们分别意味着"没碰真机"、"没人确认夹住"、"人按回车才动作"，都够不上 docx §六 的
+"正常任务过程中不进行人工类别判断和动作触发"。开了就会在 `real_run.json` 里记成
+`evidence_grade=rehearsal`，验收时一查就知道这一份能不能用。
+
 与仿真线的分工：sort_core / 契约 / 日志 schema 两边**完全共用**；差别只有 config 目录
 （config/ 是甲的场景坐标，config_real/ 是现场实测值）和这两个缝隙的实现。
 """
@@ -35,11 +48,15 @@ for p in (_EXP3, _HERE):
 import config_check                                        # noqa: E402  (exp3/config_check.py)
 from sort_core.logging_util import Exp3RunLog, make_run_dir  # noqa: E402
 from sort_core.task import OK, TaskController               # noqa: E402
-from sort_core.taxonomy import REASON_ABORTED, REASON_SAFETY_STOP  # noqa: E402
+from sort_core.taxonomy import (REASON_ABORTED, REASON_NO_EXEC,  # noqa: E402
+                                REASON_SAFETY_STOP)
+from real import ep_conn                                    # noqa: E402
 from real.camera import (MockDetector, YoloDetector, load_detector_file,  # noqa: E402
                          load_scene, make_scan, open_camera)
 from real.dry_run import DryRunRM                           # noqa: E402
 from real.ep_backend import EPPickExecutor, EPPickPlace      # noqa: E402
+
+_CALIB_GUIDE = 'real/标定说明.md'
 
 
 def _load(path):
@@ -88,8 +105,9 @@ def gate(cfg, config_dir):
         for it in cal:
             print('  [%s] %-6s %s' % (it['severity'], it['who'], it['msg']))
         print('\n自检命令: python3 config_check.py --config-dir %s --require-calibrated' % config_dir)
-        print('标定步骤: ep/标定说明.md §1(底盘 odom) §2(臂 jog) §3(夹爪试夹)；'
-              '相机标定见 config_real/task.json 的 camera.calibration 说明')
+        print('标定步骤: %s；工具: python3 real/calibrate.py（本表读数直接写回，不用手抄）'
+              % _CALIB_GUIDE)
+        print('          相机标定见 config_real/task.json 的 camera.calibration 说明（乙）')
         sys.exit(1)
     if n_err:
         print('\nFAIL: config 结构有 %d 项 ERROR —— 拒绝启动' % n_err)
@@ -139,7 +157,17 @@ def main(argv=None):
     ap.add_argument('--assume-judge', action='store_true',
                     help='★把人工确认换成"一律算成功" —— 只给无人值守演练，真机验收别开')
     ap.add_argument('--no-pause', action='store_true', help='开局不等回车')
+    ap.add_argument('--confirm-each', action='store_true',
+                    help='★每个物体动手前等一次回车 —— 真机**首跑**人盯用；'
+                         '它是"人工触发动作"，验收跑不能开')
     args = ap.parse_args(argv)
+
+    # 三个开关都会让这次运行够不上验收凭据（docx §六：不进行人工类别判断和动作触发）：
+    #   --dry-run      = 没碰真机；--assume-judge = 没人确认夹住；
+    #   --confirm-each = 人按回车才动作。
+    # 与其靠人记，不如算出来写进 real_run.json —— 验收时一查就知道能不能用。
+    rehearsal = [n for n in ('dry_run', 'assume_judge', 'confirm_each')
+                 if getattr(args, n.replace('-', '_'))]
 
     cfg = load_real_configs(args.config_dir)
     task, grid, bins, ep_cfg = cfg['task'], cfg['grid_cells'], cfg['bins'], cfg['ep_waypoints']
@@ -165,17 +193,44 @@ def main(argv=None):
     if args.assume_judge:
         runlog.text('*** 警告: HELD/PLACED 已改成 assume_ok —— 没有人确认夹起/放正。'
                     '真机验收不能这样跑。')
+    if args.confirm_each:
+        runlog.text('*** 警告: --confirm-each 开着 —— 每个物体由人按回车才动手。'
+                    '这是"人工触发动作"，**验收跑不能开**；只给真机首跑人盯用。')
+    runlog.text('证据等级: ' + ('acceptance（可作验收凭据）' if not rehearsal else
+                                'rehearsal（**不能**作验收凭据）—— 开了 %s'
+                                % '+'.join(rehearsal)))
 
     camera = open_camera(args.camera, (task['camera']['image_width_px'],
                                        task['camera']['image_height_px']), runlog)
     detector = build_detector(args, grid, task, runlog)
     scan = make_scan(camera, detector, runlog)
 
-    rm = DryRunRM(runlog) if args.dry_run else _connect_real_ep(ep_cfg, runlog)
+    try:
+        rm = DryRunRM(runlog) if args.dry_run else ep_conn.connect(ep_cfg, runlog)
+    except ep_conn.EPConnectError as e:
+        # "连都没连上"要能和"跑了失败"从文件上分开 —— 照实记一次没跑成的运行。
+        runlog.text('== 连不上 EP，本次没有执行任何动作 ==')
+        runlog.text(str(e))
+        runlog.write_result(0, 0, task['expected_total'], task['pass_line'],
+                            REASON_NO_EXEC, {})
+        _write_real_context(run_dir, args, calib_rec,
+                            dict(placed_ok=0, objects_seen=0, exit_status=REASON_NO_EXEC,
+                                 reasons={}),
+                            REASON_NO_EXEC, None, None, runlog, rehearsal,
+                            outcome='connect_failed', connect_error=str(e))
+        print('\nFAIL: 连不上 EP —— 本次没有执行任何动作（不是"跑了失败"）。')
+        for line in str(e).splitlines():
+            print('  %s' % line)
+        print('run_dir: %s（result.json 里 placed_ok=0 / exit_status=%s；'
+              'real_run.json 的 outcome=connect_failed）' % (run_dir, REASON_NO_EXEC))
+        return 1
+
     ex = EPPickExecutor(rm, ep_cfg, log=runlog, ask=_ask_stdin)
     pick_place = EPPickPlace(ex, grid, bins, log=runlog)
     if hasattr(detector, 'mark_picked'):
         pick_place = _with_mark_picked(pick_place, detector, runlog)
+    if args.confirm_each:
+        pick_place = _with_confirm_each(pick_place, runlog)
 
     def safe_stop(reason):
         runlog.text('=== 安全停止(%s)：收尾（开爪/抬到高/回 HOME）===' % reason)
@@ -214,7 +269,8 @@ def main(argv=None):
     runlog.write_result(summary['placed_ok'], summary['objects_seen'],
                         task['expected_total'], task['pass_line'],
                         exit_status, summary['reasons'])
-    _write_real_context(run_dir, args, calib_rec, summary, exit_status, ex, rm, runlog)
+    _write_real_context(run_dir, args, calib_rec, summary, exit_status, ex, rm, runlog,
+                        rehearsal)
 
     with open(os.path.join(run_dir, 'result.json'), encoding='utf-8') as f:
         res = _load(os.path.join(run_dir, 'result.json'))
@@ -239,79 +295,60 @@ def _with_mark_picked(pick_place, detector, log):
     return wrapped
 
 
-def _connect_real_ep(ep_cfg, log):
-    """连 EP。SDK 没装/连不上时给可执行的排查步骤，而不是一段 traceback。
+def _with_confirm_each(pick_place, log):
+    """--confirm-each：每个物体动手**之前**等一次回车。
 
-    RM 是实验二那套（mecharm-grasp-exp/ep/drive/rm.py），**故意不在 exp3/ 里再抄一份**：
-    两份驱动一定会漂。代价是 exp3 的公开快照(exp3_public/)里没有 ep/，那边连不了真机、
-    只能 --dry-run —— 这没问题，公开仓本来也没有机器人。
+    这是把实验二的首跑纪律（`ep/标定说明.md` §4：`pause_each_phase=true`，每段回车、全程人盯）
+    搬到实验三（`real/标定说明.md` §6 第 2 步）。它**只给真机首跑**用 —— 人按回车才动作，本身就是 docx §六 所说的
+    "人工触发动作"，所以开了它这一轮就记成 rehearsal，不能当验收凭据。
+
+    留在这里而不是塞进 sort_core：那是两条线共用的核心，不该为了调试多一个开关。
     """
-    repo = os.path.dirname(_EXP3)
-    if repo not in sys.path:
-        sys.path.insert(0, repo)
-    try:
-        from ep.drive.rm import RM
-    except ImportError as e:
-        raise SystemExit('真机驱动 import 失败（%s）—— 它在 mecharm-grasp-exp/ep/drive/rm.py，'
-                         '是实验二那套。若你拿的是 exp3 的独立快照，目录里没有 ep/，'
-                         '真机跑请在完整仓库里执行；只想演练就加 --dry-run' % e)
-    # RM 要的是 ep/config_ep.json 那套结构（robot/chassis/arm/gripper）；
-    # 真机点位/姿态从 config_real/ep_waypoints.json 取，两者合起来才够驱动。
-    base_path = os.path.normpath(os.path.join(_EXP3, '..', 'ep', 'config_ep.json'))
-    try:
-        base = _load(base_path)
-    except IOError as e:
-        raise SystemExit('读不到 EP 连接配置 %s: %s' % (base_path, e))
-    base['chassis'] = dict(base.get('chassis') or {})
-    base['chassis'].update({k: v for k, v in ep_cfg.get('chassis', {}).items()
-                            if k != '_note'})
-    base['arm'] = dict(base.get('arm') or {})
-    base['arm']['grab_low'] = ep_cfg['arm']['grab_low_mm']
-    base['arm']['lift_high'] = ep_cfg['arm']['lift_high_mm']
-    base['arm']['release_low_override'] = ep_cfg['arm'].get('release_low_mm')
-    base['arm']['lift_wait_s'] = ep_cfg['arm'].get('lift_wait_s', 1.0)
-    base['arm']['drop_wait_s'] = ep_cfg['arm'].get('drop_wait_s', 1.0)
-    base['gripper'] = dict(base.get('gripper') or {})
-    base['gripper'].update({k: v for k, v in (ep_cfg.get('gripper') or {}).items()
-                            if k != '_note'})
-    log.text('EP 连接参数: conn_type=%s  arm 经 %s'
-             % ((base.get('robot') or {}).get('conn_type'),
-                (base.get('arm') or {}).get('attr_candidates')))
-    rm = RM(base, log)
-    try:
-        rm.connect()
-    except Exception as e:
-        print('\nFAIL: 连不上 EP —— %s' % e)
-        print('排查: ① robomaster SDK 装了吗（python3 -c "import robomaster"）')
-        print('      ② 电脑连上 EP 热点了? 还是该把 ep/config_ep.json 的 conn_type 改 sta?')
-        print('      ③ EP 是**工程形态**吗（步兵形态没有 arm/gripper）')
-        print('先跑: python3 ep/drive/env_check.py --config ep/config_ep.json')
-        sys.exit(1)
-    return rm
+    def wrapped(cell_id, cls):
+        log.text('等待操作员确认后执行: %s / %s' % (cell_id, cls))
+        print('\n下一个: %s 的 %s —— 看一眼桌面和车的位置（有没有跑偏/挡住/掉了东西）。'
+              % (cell_id, cls))
+        ans = input('回车执行，输入 q 中止 > ').strip().lower()
+        if ans in ('q', 'quit', 'x'):
+            raise KeyboardInterrupt('操作员中止')
+        return pick_place(cell_id, cls)
+    return wrapped
 
 
-def _write_real_context(run_dir, args, calib_rec, summary, exit_status, ex, rm, runlog):
+def _write_real_context(run_dir, args, calib_rec, summary, exit_status, ex, rm, runlog,
+                        rehearsal, outcome='ran', connect_error=None):
     """把"这次是怎么跑出来的"单独留档：result.json 保持与仿真线同一 schema，
-    真机特有的上下文(演练/标定记录/人工介入次数)写这里，验收时才查得清。"""
+    真机特有的上下文(演练/标定记录/人工介入次数/证据等级)写这里，验收时才查得清。
+
+    ex / rm 允许为 None —— 连不上 EP 时走的就是那条路（那时没有执行者，也没连上机器人）。
+    """
     data = dict(
+        outcome=outcome,                      # ran | connect_failed
+        evidence_grade='rehearsal' if rehearsal else 'acceptance',
+        rehearsal_reasons=list(rehearsal),
         dry_run=bool(args.dry_run),
         config_dir=os.path.abspath(args.config_dir),
         camera=args.camera, detector=args.detector,
         detector_source=(args.model or args.detector_file or 'builtin-mock'),
         assume_judge=bool(args.assume_judge),
-        judge={'held': ex.judge.get('held'), 'placed': ex.judge.get('placed')},
+        confirm_each=bool(args.confirm_each),
+        judge=({'held': ex.judge.get('held'), 'placed': ex.judge.get('placed')}
+               if ex else None),
         calibration=calib_rec,
-        operator_confirms=ex.n_asks,
+        operator_confirms=(ex.n_asks if ex else None),
         exit_status=exit_status,
         summary=summary,
         run_dir=run_dir,
     )
+    if connect_error:
+        data['connect_error'] = connect_error
     if isinstance(rm, DryRunRM):
         data['dry_run_primitive_calls'] = len(rm.calls)
     with open(os.path.join(run_dir, 'real_run.json'), 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-    runlog.text('real_run.json 已写（dry_run=%s，人工确认 %d 次）'
-                % (args.dry_run, ex.n_asks))
+    runlog.text('real_run.json 已写（outcome=%s  evidence_grade=%s  人工确认 %s 次）'
+                % (outcome, data['evidence_grade'],
+                   ex.n_asks if ex else '-'))
     if isinstance(rm, DryRunRM):
         runlog.text(rm.dump())
 

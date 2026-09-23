@@ -433,7 +433,7 @@ def check_calibration(task, grid, bins, ep=None):
     ecal = ep.get('calibration')
     if not isinstance(ecal, dict) or ecal.get('status') != 'calibrated':
         out.append(_issue(ERROR, 'ep', 'ep_waypoints.json 未标定（calibration.status=%r）—— '
-                                       '按 ep/标定说明.md 现场标 EP 位姿'
+                                       '按 real/标定说明.md 现场标 EP 位姿'
                                        % (ecal or {}).get('status')))
     else:
         for k in ('by', 'date', 'venue'):
@@ -443,7 +443,7 @@ def check_calibration(task, grid, bins, ep=None):
     ch = ep.get('chassis') or {}
     if ch.get('home_pose') is None:
         out.append(_issue(ERROR, 'ep', 'chassis.home_pose 仍是 null（未标定）—— 用 '
-                                       'ep/drive/env_check.py --odom 读 odom 回填'))
+                                       'real/calibrate.py --odom 读 odom 后 --record 回填'))
     for ep_key in ('cell_pose', 'bin_pose'):
         miss = [k for k, v in (ep.get(ep_key) or {}).items()
                 if k != '_note' and v is None]
@@ -453,7 +453,7 @@ def check_calibration(task, grid, bins, ep=None):
     miss = [k for k in EP_ARM_REQUIRED if (ep.get('arm') or {}).get(k) is None]
     if miss:
         out.append(_issue(ERROR, 'ep', 'arm 还有未标定项：%s —— 用 '
-                                       'ep/drive/env_check.py --jog 逐档试出来'
+                                       'real/calibrate.py --record-arm 逐档试出来'
                                        % '、'.join(miss)))
     return out
 

@@ -128,7 +128,8 @@ class EPPickExecutor(PickExecutor):
     def _arm_pose(self, key, what):
         v = self.arm.get(key)
         if not v:
-            raise RuntimeError('arm.%s 未标定 —— 用 ep/drive/env_check.py --jog 试出来再填' % key)
+            raise RuntimeError('arm.%s 未标定 —— 用 real/calibrate.py --record-arm 试出来再填'
+                               '（real/标定说明.md §2）' % key)
         return v
 
     def _grab_low(self):
