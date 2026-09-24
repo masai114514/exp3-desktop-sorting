@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>实验三 提交材料对照表（任务书 §七）</title>
+<style>
+  body { font-family: SimSun, 宋体, serif; color: #1C2536; }
+  table { border-collapse: collapse; width: 100%; }
+</style>
+</head>
+<body>
+
+<h1 style="font-family: SimHei, 黑体, sans-serif; font-size: 17pt; color: #17427A; text-align: center; margin: 0 0 6pt 0;">实验三《桌面物体自动分类整理》提交材料对照表</h1>
+
+<p style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; color: #5A6675; text-align: center; margin: 0 0 10pt 0;">任务书 §七　｜　机械臂集成小组项目Ⅰ　｜　组长 马晨曦（24020036047）　｜　赵彦淞 · 安思瀚　｜　2026-09</p>
+
+<table>
+  <tr>
+    <td style="width: 20%; font-family: SimHei, 黑体, sans-serif; font-size: 10.5pt; font-weight: bold; color: #FFFFFF; background-color: #17427A; border: 1pt solid #17427A; padding: 4pt;">任务书要求（§七）</td>
+    <td style="width: 38%; font-family: SimHei, 黑体, sans-serif; font-size: 10.5pt; font-weight: bold; color: #FFFFFF; background-color: #17427A; border: 1pt solid #17427A; padding: 4pt;">落地物（仓库内路径）</td>
+    <td style="width: 27%; font-family: SimHei, 黑体, sans-serif; font-size: 10.5pt; font-weight: bold; color: #FFFFFF; background-color: #17427A; border: 1pt solid #17427A; padding: 4pt;">打开就能核对的证据</td>
+    <td style="width: 15%; font-family: SimHei, 黑体, sans-serif; font-size: 10.5pt; font-weight: bold; color: #FFFFFF; background-color: #17427A; border: 1pt solid #17427A; padding: 4pt;">现状</td>
+  </tr>
+
+  <tr>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">§七.1　完整 ROS 2 工程、Launch 文件和依赖说明</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;"><span style="font-family: Consolas, monospace;">exp3_public/exp3/</span>：<span style="font-family: Consolas, monospace;">sort_core/</span> 任务控制核心 ＋ <span style="font-family: Consolas, monospace;">ros2/sort_msgs/</span> 取放契约 ＋ <span style="font-family: Consolas, monospace;">ros2/exp3_sim/</span> 仿真包 ＋ <span style="font-family: Consolas, monospace;">real/</span> 真机线<br>单 Launch：<span style="font-family: Consolas, monospace;">exp3/ros2/exp3_sim/launch/exp3_sim.launch.py</span><br>依赖说明：<span style="font-family: Consolas, monospace;">exp3/docs/依赖说明.md</span></td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">这一个 launch 文件同时起相机、识别、机械臂与任务控制<br><span style="font-family: Consolas, monospace;">colcon build --packages-select exp3_sim</span> 通过，且 <span style="font-family: Consolas, monospace;">ros2 pkg list</span> 命中 <span style="font-family: Consolas, monospace;">exp3_sim</span> / <span style="font-family: Consolas, monospace;">sort_msgs</span><br>实跑留证：<span style="font-family: Consolas, monospace;">实验3_仿真运行证据_20260923/r11_20260924/</span></td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;"><span style="color: #0F766E; font-weight: bold;">✅ 单 Launch 实跑已通过</span><br>2026-09-24 仿真记分轮<br><span style="font-family: Consolas, monospace;">verdict=PASS</span>　placed_ok=5 / objects_seen=6　规划失败 0</td>
+  </tr>
+
+  <tr>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">§七.2　目标检测模型、类别说明及桌面网格配置</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">模型：<span style="font-family: Consolas, monospace;">weights/best.pt</span>（YOLOv8，22.5 MB，类 <span style="font-family: Consolas, monospace;">cup</span> / <span style="font-family: Consolas, monospace;">mouse</span>）<br>类别说明：<span style="font-family: Consolas, monospace;">exp3/sort_core/taxonomy.py</span>、<span style="font-family: Consolas, monospace;">exp3/config/task.json</span> 的 <span style="font-family: Consolas, monospace;">classes</span><br>网格配置：<span style="font-family: Consolas, monospace;">exp3/config/grid_cells.json</span>（仿真六格）、<span style="font-family: Consolas, monospace;">exp3/config_real/grid_cells.json</span>（现场实测）</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">识别短片用 <span style="font-family: Consolas, monospace;">--detector yolo</span> 跑，画面带框与置信度<br><span style="font-family: Consolas, monospace;">config_check.py</span> 读出六格与两个料盒</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">模型与类别齐<br><span style="color: #C2410C; font-weight: bold;">⏳ 真机网格坐标待实测回填</span></td>
+  </tr>
+
+  <tr>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">§七.3　BehaviorTree XML 或状态机配置文件</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">规格：<span style="font-family: Consolas, monospace;">exp3/docs/state_machine.md</span>（本次新写，20.5 KB：11 个状态与转移表、三关判定、EXEC 六段子状态机）<br>阈值载体：<span style="font-family: Consolas, monospace;">exp3/config/task.json</span>（<span style="font-family: Consolas, monospace;">fail_limit</span> / <span style="font-family: Consolas, monospace;">no_exec_limit</span> / <span style="font-family: Consolas, monospace;">max_rounds</span>）</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">打开该文档，逐条与 <span style="font-family: Consolas, monospace;">sort_core/task.py</span> 对应；阈值与代码同源</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;"><span style="color: #0F766E; font-weight: bold;">✅ 已有</span><br>原为零产物，本次补齐</td>
+  </tr>
+
+  <tr>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">§七.4　仿真与真机演示视频</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;"><span style="font-family: Consolas, monospace;">exp3_sim.mp4</span>、<span style="font-family: Consolas, monospace;">exp3_real.mp4</span></td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">能播即可；按老师确认的口径，答辩只播视频<br>仿真录屏：<span style="font-family: Consolas, monospace;">实验3_仿真运行证据_20260923/exp3_sim.mp4</span>（393.7 s / 640×480 / 10 fps / 3937 帧 0 丢帧，画面左下角烧入仿真时间戳，可与 <span style="font-family: Consolas, monospace;">records.jsonl</span> 逐行对齐）<br>录屏脚本：<span style="font-family: Consolas, monospace;">实验3_仿真运行证据_20260923/cam_record.py</span>（订阅 <span style="font-family: Consolas, monospace;">/overhead/image_raw</span> 写 mp4，不依赖 GL）</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;"><span style="color: #0F766E; font-weight: bold;">✅ 仿真演示视频已有</span><br><span style="color: #C2410C; font-weight: bold;">⏳ 真机待现场</span><br>注：该段录的是 <span style="font-family: Consolas, monospace;">run_20260924_114931</span>（录屏并发，placed_ok=3），记录轮 PASS 的凭据另有 <span style="font-family: Consolas, monospace;">run_20260924_112831</span></td>
+  </tr>
+
+  <tr>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">§七.5　分类结果、异常测试记录、任务日志和简要实验报告</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">分类结果：现场作业包 <span style="font-family: Consolas, monospace;">5_分类结果记录表.md</span>（空表，现场照抄）<br>异常测试记录：<span style="font-family: Consolas, monospace;">exp3/docs/异常测试记录.md</span><br>任务日志：<span style="font-family: Consolas, monospace;">exp3/exp3_logs/run_*/</span>（<span style="font-family: Consolas, monospace;">result.json</span>、<span style="font-family: Consolas, monospace;">records.jsonl</span>、<span style="font-family: Consolas, monospace;">run.log</span>）<br>简要报告：小组报告与三份个人报告</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">离线已有两轮完整记录：<span style="font-family: Consolas, monospace;">run_20260912_161910</span>、<span style="font-family: Consolas, monospace;">run_20260916_164515</span>，<span style="font-family: Consolas, monospace;">verdict=PASS</span>、<span style="font-family: Consolas, monospace;">placed_ok=6</span><br>仿真记分轮 <span style="font-family: Consolas, monospace;">run_20260924_112831</span>：<span style="font-family: Consolas, monospace;">verdict=PASS</span>、<span style="font-family: Consolas, monospace;">placed_ok=5</span>、规划失败 0<br>仿真异常轮 <span style="font-family: Consolas, monospace;">run_20260924_114058</span>（c3 空置）单独跑，预期 <span style="font-family: Consolas, monospace;">verdict=TRIAL</span> 且无 c3 记录<br>真机每轮成败由 <span style="font-family: Consolas, monospace;">result.json</span> 的 <span style="font-family: Consolas, monospace;">verdict</span> / <span style="font-family: Consolas, monospace;">exit_status</span> / <span style="font-family: Consolas, monospace;">reasons</span> 三个字段给出</td>
+    <td style="font-family: SimSun, 宋体, serif; font-size: 10.5pt; border: 1pt solid #D5DDE7; padding: 4pt; vertical-align: top;">结构齐<br><span style="color: #0F766E; font-weight: bold;">✅ 仿真两轮记录已有</span><br><span style="color: #C2410C; font-weight: bold;">⏳ 记录表与现场两轮待回填</span></td>
+  </tr>
+</table>
+
+<p style="font-family: SimSun, 宋体, serif; font-size: 10pt; color: #5A6675; margin: 8pt 0 0 0;">说明：本表每一格都可回溯到仓库里的具体文件；标 ⏳ 的数值与截图等现场产生，本表不预先填写。</p>
+
+<p style="font-family: SimSun, 宋体, serif; font-size: 10pt; color: #1C2536; margin: 6pt 0 0 0;"><b>仿真记分轮的口径（务必分开陈述）：</b>云机容器内无 GPU，Gazebo 走软件渲染，跑到第 3~4 轮会出现画面停滞（帧戳推进而内容不变），依赖图像的 HSV 检测因此失效。为把故障隔离在渲染这一段、继续验证下游链路，记分轮改用<b>真值投影</b>生成检测框：物块世界坐标经同一份已标定的相机参数投影为像素，再走完全相同的像素 → 桌面 → 网格映射，相机标定与映射链路未作改动。因此该轮能证明<b>标定与投影链路正确、规划-取放-落料-回航执行链可行</b>；<b>不</b>声称 HSV 检测算法在整轮任务中稳定有效（渲染健康的第 1 轮 HSV 实测 6/6 正确映射，作为检测算法有效性的证据单独保留）。遗留：叠第 2 层时物块互穿导致 LCP 爆解（<span style="font-family: Consolas, monospace;">LCP=122847</span>），第 2 层落差 <span style="font-family: Consolas, monospace;">dz</span> 需加大。</p>
+
+</body>
+</html>

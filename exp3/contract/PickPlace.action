@@ -22,15 +22,24 @@
 #   ok 情况 success=true；失败 reason ∈ {grasp_failed, dropped_or_missed_place,
 #   unreachable_target, exec_error, aborted}；normal(?) 安全停止用 aborted/safety 语义由服务端补 detail。
 
+# ★★ 段落顺序：ROS 2 的 .action 段落顺序是**固定的 Goal / Result / Feedback**★★
+#    第二段永远是 Result、第三段永远是 Feedback，与"哪个语义更重要"无关。
+#    （2026-09-23 修正：原先把 Feedback 写在第二段，导致 rosidl 把 stage/note 生成成
+#      Result、把 success/reason/detail 生成成 Feedback，服务端/客户端一读就 AttributeError。）
+#    本文件既是权威语义注释，也是可直接编译的合法 .action —— 段名与 `---` 分隔符一一对应，
+#    防回归测试见 tests/test_action_contract.py。
+
 # ================= Goal =================
 string cell_id        # 目标网格 id（必须存在于 config/grid_cells.json 的 cells[].id）
 string cls            # 期望类别，如 'cup' / 'mouse'（服务端可拿它与识别类别校验）
 
-# ================= Feedback =================
-int32 stage           # 当前阶段（见上约定；-1=失败进行中）
-string note           # 人类可读进度，如 'descending to c3'
-
+---
 # ================= Result =================
 bool success          # 是否完成一次成功的“取放 + 退回安全位”
 string reason         # 失败原因枚举；success=true 时为 'ok'
 string detail         # 自由文本（进日志 detail 字段）
+
+---
+# ================= Feedback =================
+int32 stage           # 当前阶段（见上约定；-1=失败进行中）
+string note           # 人类可读进度，如 'descending to c3'

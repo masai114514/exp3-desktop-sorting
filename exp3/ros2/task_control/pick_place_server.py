@@ -28,6 +28,7 @@ from sort_core.taxonomy import (STAGE_APPROACH, STAGE_GRASP, STAGE_LIFT,
                                 REASON_UNREACHABLE, REASON_EXEC_ERROR,
                                 REASON_ABORTED)
 from ros2.task_control.exec_contract import PickExecutor, resolve_goal
+from sort_core.decision import bin_for_cls
 
 # 每个动作段的失败 reason：唯一例外是『规划/驱动硬错』(异常) → exec_error / unreachable
 _FAIL_IF_STAGE_FAILS = {
@@ -46,9 +47,20 @@ class PickPlaceServer(Node):
         self.grid = grid
         self.bins = bins
         self.exec = executor
+        # 每个料盒已成功放入几个 → 决定下一个物块用哪个落料点(slot)。
+        # ★ 只在【放置被确认】时才 +1，不是在动作整体成功时：retract 失败不该占用落料点，
+        #   否则下一个物块会落到同一个点上（重叠 → LCP 爆解，把前一个炸飞）。
+        #   见 run_20260924_005503 的教训（c1 被抛到 (-75.2, 47.7) m）。
+        self._slots = {}
         self._as = ActionServer(self, PickPlace, action_name,
                                 execute_callback=self._on_goal,
                                 cancel_callback=self._on_cancel)
+
+    def _claim_slot(self, bin_id):
+        """放置确认后占用一个落料点，返回占用到的序号。"""
+        n = self._slots.get(bin_id, 0)
+        self._slots[bin_id] = n + 1
+        return n
 
     def _fb(self, gh, stage, note):
         gh.publish_feedback(PickPlace.Feedback(
@@ -71,11 +83,24 @@ class PickPlaceServer(Node):
         g = gh.request
         t0 = time.monotonic()
         result = PickPlace.Result(success=False, reason=REASON_EXEC_ERROR, detail='')
-        ctx, err = resolve_goal(self.grid, self.bins, g.cell_id, g.cls)
+        bin_id = bin_for_cls(g.cls, self.bins)
+        slot = self._slots.get(bin_id, 0)
+        ctx, err = resolve_goal(self.grid, self.bins, g.cell_id, g.cls, slot=slot)
         if err:
             result.reason, result.detail = REASON_EXEC_ERROR, err
             gh.abort()
             return result
+        self.get_logger().info(
+            'goal %s/%s → %s slot=%s B=(%.3f,%.3f,+%.3f)'
+            % (g.cell_id, g.cls, ctx['bin_id'], ctx['slot_index'],
+               ctx['B']['x'], ctx['B']['y'], ctx['B']['z_drop']))
+
+        def _release_and_claim():
+            ok, note = self.exec.release(ctx)
+            if ok:
+                # 放置已确认 → 占用落料点（下一个同类别物块换下一个点）
+                self._claim_slot(ctx['bin_id'])
+            return ok, note
 
         try:
             chain = (
@@ -83,7 +108,7 @@ class PickPlaceServer(Node):
                 (STAGE_GRASP, lambda: self.exec.grasp(ctx)),
                 (STAGE_LIFT, lambda: self.exec.lift(ctx)),
                 (STAGE_MOVE_TO_BIN, lambda: self.exec.carry(ctx)),
-                (STAGE_PLACE, lambda: self.exec.release(ctx)),
+                (STAGE_PLACE, _release_and_claim),
                 (STAGE_RETRACT, lambda: self.exec.retract(ctx)),
             )
             for stage, fn in chain:
@@ -107,8 +132,9 @@ class PickPlaceServer(Node):
 
         result.success = True
         result.reason = 'ok'
-        result.detail = '%s→%s ok in %.1fs' % (ctx['cell_id'], ctx['bin_id'],
-                                               time.monotonic() - t0)
+        result.detail = '%s→%s slot%d ok in %.1fs' % (ctx['cell_id'], ctx['bin_id'],
+                                                      ctx['slot_index'],
+                                                      time.monotonic() - t0)
         gh.succeed()
         return result
 

@@ -57,7 +57,7 @@ class C4PickExecutor(PickExecutor):
         A_above = (A['x'], A['y'], A['z_pick'])  # 到格上方的安全高度
         A_grasp = (A['x'], A['y'], zg)
         A_lift = (A['x'], A['y'], zg + self._lift_dz)
-        B_place = (B['x'], B['y'], self._place_z)
+        B_place = (B['x'], B['y'], self._place_z + B.get('z_drop', 0.0))
         return A_above, A_grasp, A_lift, B_place
 
     # ---------- 判据（默认 assume；Gazebo 联调 override 接真感知） ----------

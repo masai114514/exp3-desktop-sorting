@@ -1,0 +1,7 @@
+{"decision": "exec", "cell_id": "c1", "cls": "cup", "conf": 0.99, "grasp_ok": true, "place_ok": true, "reason": null, "detail": "c1→bin_cup slot0 ok in 43.0s", "ts": "2026-09-24T11:41:41"}
+{"decision": "skip", "cell_id": null, "cls": "cup", "conf": 0.99, "skip_reason": "out_of_grid", "ts": "2026-09-24T11:41:41"}
+{"decision": "exec", "cell_id": "c2", "cls": "mouse", "conf": 0.99, "grasp_ok": true, "place_ok": true, "reason": null, "detail": "c2→bin_mouse slot0 ok in 50.1s", "ts": "2026-09-24T11:42:31"}
+{"decision": "skip", "cell_id": null, "cls": "mouse", "conf": 0.99, "skip_reason": "out_of_grid", "ts": "2026-09-24T11:42:31"}
+{"decision": "exec", "cell_id": "c4", "cls": "cup", "conf": 0.99, "grasp_ok": true, "place_ok": true, "reason": null, "detail": "c4→bin_cup slot1 ok in 42.4s", "ts": "2026-09-24T11:43:14"}
+{"decision": "exec", "cell_id": "c5", "cls": "mouse", "conf": 0.99, "grasp_ok": true, "place_ok": true, "reason": null, "detail": "c5→bin_mouse slot1 ok in 47.2s", "ts": "2026-09-24T11:44:01"}
+{"decision": "exec", "cell_id": "c6", "cls": "cup", "conf": 0.99, "grasp_ok": true, "place_ok": true, "reason": null, "detail": "c6→bin_cup slot2 ok in 55.7s", "ts": "2026-09-24T11:44:57"}

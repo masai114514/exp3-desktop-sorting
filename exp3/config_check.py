@@ -160,6 +160,79 @@ def check_bins(bins, task=None):
         if extra:
             out.append(dict(severity=WARN, who='bins',
                             msg='class_to_bin 有 classes 之外类别: %s' % extra))
+    out.extend(_check_bin_slots(bins, bd, classes))
+    return out
+
+
+def _check_bin_slots(bins, bd, classes):
+    """校验每个料盒的 slots（同盒多物的错位落料点）。
+
+    为什么值得校验：slots 只写偏移量，错了不会报错，只会在实跑时表现为
+    "第 2 个物块下降途中穿进第 1 个的体内 → ODE 的 LCP 爆解 → 已放好的被炸飞"。
+    这类错误在日志里看起来像物理玄学，所以要在配置阶段就拦住。
+
+    slots 是**可选**字段（旧配置/真机线未标定时不写）：缺省不报 issue；
+    一旦写了就必须满足：dx/dy/dz 为数值、落料点（含物体半尺寸）在料盒内腔之内、
+    同一层(dz 相同)内的落料点互不重叠。
+    """
+    out = []
+    geo = (bins or {}).get('slots_geometry_m') or {}
+    hx = geo.get('bin_inner_x_half')
+    hy = geo.get('bin_inner_y_half')
+    half_of = _object_half_extents(geo)
+    for bid, b in (bd or {}).items():
+        slots = b.get('slots')
+        if slots is None:
+            continue
+        if not isinstance(slots, list) or not slots:
+            out.append(dict(severity=ERROR, who='bins',
+                            msg='bin %s 的 slots 需为非空列表: %r' % (bid, slots)))
+            continue
+        ok_slots = []
+        for i, s in enumerate(slots):
+            if not isinstance(s, dict) or not all(_num(s.get(k, 0.0), k)
+                                                  for k in ('dx', 'dy', 'dz')):
+                out.append(dict(severity=ERROR, who='bins',
+                                msg='bin %s 的 slots[%d] 需含数值 dx/dy/dz: %r' % (bid, i, s)))
+                continue
+            ok_slots.append(s)
+        if not _num(hx, 'hx') or not _num(hy, 'hy'):
+            continue                      # 没有内腔尺寸就没法判越界，跳过（不是错误）
+        rad = half_of.get(b.get('cls'))
+        if rad is None:
+            continue
+        for i, s in enumerate(ok_slots):
+            dx, dy = s.get('dx', 0.0), s.get('dy', 0.0)
+            if abs(dx) + rad[0] > hx + 1e-9 or abs(dy) + rad[1] > hy + 1e-9:
+                out.append(dict(severity=ERROR, who='bins',
+                                msg='bin %s 的落料点 (%.4f,%.4f) 加物体半尺寸后超出内腔 '
+                                    '(±%.4f, ±%.4f)' % (bid, dx, dy, hx, hy)))
+        # 同层互不重叠：同 dz 的两点，|Δx|≥两半宽之和 或 |Δy|≥两半高之和
+        for i in range(len(ok_slots)):
+            for j in range(i + 1, len(ok_slots)):
+                a, c = ok_slots[i], ok_slots[j]
+                if abs(a.get('dz', 0.0) - c.get('dz', 0.0)) > 1e-9:
+                    continue
+                gap_x = abs(a.get('dx', 0.0) - c.get('dx', 0.0))
+                gap_y = abs(a.get('dy', 0.0) - c.get('dy', 0.0))
+                if gap_x + 1e-9 < 2 * rad[0] and gap_y + 1e-9 < 2 * rad[1]:
+                    out.append(dict(severity=ERROR, who='bins',
+                                    msg='bin %s 的 slots[%d] 与 slots[%d] 同层且重叠'
+                                        '（Δx=%.4f<%.4f 且 Δy=%.4f<%.4f）—— '
+                                        '落料时会互穿，必须错开或叠层'
+                                        % (bid, i, j, gap_x, 2 * rad[0], gap_y, 2 * rad[1])))
+    return out
+
+
+def _object_half_extents(geo):
+    """由 slots_geometry_m 推各类的半尺寸：cup=(半径,半径)，mouse=(长/2,宽/2)。"""
+    out = {}
+    if _num(geo.get('cup_diameter'), 'r'):
+        r = geo['cup_diameter'] / 2.0
+        out['cup'] = (r, r)
+    ms = geo.get('mouse_size')
+    if isinstance(ms, (list, tuple)) and len(ms) >= 2:
+        out['mouse'] = (ms[0] / 2.0, ms[1] / 2.0)
     return out
 
 

@@ -18,6 +18,7 @@ setup(
     entry_points={
         'console_scripts': [
             'color_detector = exp3_sim.color_detector:main',
+            'truth_detector = exp3_sim.truth_detector:main',
             'pick_place_server = exp3_sim.pick_place_server:main',
             'sim_task = exp3_sim.sim_task:main',
         ],

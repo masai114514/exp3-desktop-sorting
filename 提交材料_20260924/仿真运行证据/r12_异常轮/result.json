@@ -1,0 +1,13 @@
+{
+  "placed_ok": 5,
+  "objects_seen": 5,
+  "required_total": 6,
+  "pass_line": 5,
+  "verdict": "TRIAL",
+  "exit_status": "no_exec",
+  "reasons": {
+    "out_of_grid": 2,
+    "no_exec": 1
+  },
+  "run_dir": "/root/autodl-tmp/ws_mecharm/src/exp3/exp3_logs/run_20260924_114058"
+}

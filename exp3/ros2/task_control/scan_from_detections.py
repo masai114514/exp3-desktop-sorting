@@ -60,7 +60,18 @@ def _read_hypothesis(hyp):
         cp = hyp.class_probabilities[0]
         return cp.class_name, float(cp.probability)
     if hasattr(hyp, 'class_id'):
-        return _id_to_name.get(int(hyp.class_id)), float(getattr(hyp, 'score', 0.0))
+        # ★ class_id 在 vision_msgs 里是 string。真值检测器直接填 'cup'/'mouse'，
+        #   但旧链路（乙的节点）可能填的是数字 id —— 所以两种都要认。
+        #   曾经只写 int(hyp.class_id) ⇒ truth_detector 一发帧就
+        #   ValueError: invalid literal for int() with base 10: 'cup'，
+        #   sim_task 因此"等首帧超时"而死（run_20260924_1115）。
+        cid = hyp.class_id
+        if isinstance(cid, str):
+            return (cid or None), float(getattr(hyp, 'score', 0.0))
+        try:
+            return _id_to_name.get(int(cid)), float(getattr(hyp, 'score', 0.0))
+        except (TypeError, ValueError):
+            return None, None
     return None, None
 
 
@@ -86,6 +97,17 @@ class ScanFromDetections(Node):
         w, h = self._img
         stamp = msg.header.stamp.sec * 1_000_000_000 + msg.header.stamp.nanosec
         self._frame = Frame(dets_from_msg(msg, w, h), stamp)
+
+    def frame(self):
+        """拿到整帧（含 stamp_ns）。
+
+        ★ 为什么需要 stamp：实测 run_20260924_005503 里，物块互穿引爆 ODE 之后
+        **相机话题仍在以 ~48 fps 发帧，但画面内容冻结** —— 于是后续每轮扫描都读到
+        同一份陈旧检测结果，控制器把它当成"桌面上只剩盒里的那个杯"，连续 3 轮无
+        可执行目标 ⇒ `no_exec` 提前收尾，`placed_ok` 卡在 3。
+        只靠 dets 内容分辨不出"真没看到"和"画面卡住了"，必须比对帧戳。
+        """
+        return self._frame
 
     def latest(self):
         """TaskController.scan：None=还没数据（等待）；list=该帧识别结果。"""

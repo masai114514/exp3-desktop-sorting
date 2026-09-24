@@ -107,8 +107,9 @@ exp3/
 │   ├── task.json / grid_cells.json / bins.json   同 schema，数值是现场实测
 │   └── ep_waypoints.json     EP 执行侧：底盘位姿 + 臂两档 + 夹爪 + 判据
 ├── config_check.py           ★ 回填自检器：结构一致性 + **真机标定闸门**（`--require-calibrated`）
-├── docs/                     提交材料：状态机规格（docx §七.3）、异常测试记录（§三/四）、依赖说明（§七.1）
-│   └── state_machine.md      状态机规格：状态/转移/阈值/去重口径；参数文件即 config*/task.json
+├── docs/                     提交材料（docx §七.1 / §七.2 / §七.3、§三/四）
+│   ├── state_machine.md      状态机规格（§七.3）：状态/转移/阈值/去重口径；参数文件即 config*/task.json
+│   └── 模型与网格说明.md      §七.2：类别表与两个置信度门限、类→料盒、两套网格坐标、判格规则、等效像素宽门槛
 ├── sort_core/                ★ 任务控制纯 Python 核心（离线可测）
 │   ├── taxonomy.py           reason / verdict 常量
 │   ├── geometry.py           bbox 中心 → 桌面点 → 网格 cell（rectilinear / homography）

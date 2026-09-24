@@ -9,7 +9,8 @@ from launch.actions import (DeclareLaunchArgument, ExecuteProcess,
                             TimerAction)
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import (LaunchConfiguration, PathJoinSubstitution,
+                                  PythonExpression)
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
@@ -82,6 +83,15 @@ def generate_launch_description():
 
     return LaunchDescription([
         DeclareLaunchArgument('gui', default_value='false'),
+        # run_task:=false 只起场景（world/机械臂/相机/检测器/pick_place_server），
+        # 不启动 sim_task，便于单独取景标定、遮挡诊断与分段录屏。
+        DeclareLaunchArgument('run_task', default_value='true'),
+        # empty_cell:=c3 时该格故意不放物体 —— 任务书 §六「空网格应被跳过」的证据轮。
+        # 证据形式是"那一格没有任何记录"（records.jsonl 无该行、reasons 无该键）；
+        # 该轮 verdict 必然是 TRIAL（场上 5 个 < 验收线 6 个），必须与记分轮分开跑。
+        # 留空 '' = 正常 6 物记分轮。
+        DeclareLaunchArgument('empty_cell', default_value=''),
+        DeclareLaunchArgument('detector', default_value='hsv'),
         SetEnvironmentVariable('EXP3_ROOT', str(exp3_root)),
         SetEnvironmentVariable('C4_ROOT', str(c4_root)),
         SetEnvironmentVariable('DISPLAY', ':99'),
@@ -94,11 +104,28 @@ def generate_launch_description():
         TimerAction(period=22.0, actions=[controller('joint_state_broadcaster')]),
         TimerAction(period=26.0, actions=[controller('joint_trajectory_controller')]),
         TimerAction(period=30.0, actions=[controller('gripper_controller')]),
+        # detector:=hsv   吃 Gazebo 相机画面的 HSV 检测器（原链路，可证明检测算法有效）
+        # detector:=truth 真值投影检测器（model_states → table_to_px → 检测框）
+        #   ★ 为什么要有 truth：这台容器没有 GPU，Mesa 走 llvmpipe 软渲染，实测
+        #     Gazebo 相机渲染会在跑到第 3~4 轮时**卡死**（帧戳照常推进、画面内容
+        #     一字不变；run_20260924_110405 的 round4/5/6 三次扫描结果完全相同）。
+        #     物理侧是好的（物块坐标精确、臂位姿实时），卡的只有渲染这一段。
+        #     truth 模式只替换"像素→检测框"这一步，**标定与投影链路完全不变**，
+        #     用来把故障隔离在渲染上、继续验证规划-取放这条主线。
+        #     两者在报告里必须分开陈述：truth 是理想感知，不能用来证明检测算法有效。
         Node(package='exp3_sim', executable='color_detector',
-             parameters=[{'image_topic': '/overhead/image_raw'}], output='screen'),
+             parameters=[{'image_topic': '/overhead/image_raw'}], output='screen',
+             condition=IfCondition(PythonExpression(
+                 ["'", LaunchConfiguration('detector'), "' == 'hsv'"]))),
+        Node(package='exp3_sim', executable='truth_detector', output='screen',
+             condition=IfCondition(PythonExpression(
+                 ["'", LaunchConfiguration('detector'), "' == 'truth'"]))),
         TimerAction(period=35.0, actions=[
             Node(package='exp3_sim', executable='pick_place_server',
-                 parameters=[{'base_z': 0.8}], output='screen')]),
+                 parameters=[{'base_z': 0.8,
+                              'empty_cell': LaunchConfiguration('empty_cell')}],
+                 output='screen')]),
         TimerAction(period=39.0, actions=[
-            Node(package='exp3_sim', executable='sim_task', output='screen')]),
+            Node(package='exp3_sim', executable='sim_task', output='screen',
+                 condition=IfCondition(LaunchConfiguration('run_task')))]),
     ])
